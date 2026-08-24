@@ -1,0 +1,47 @@
+# DevEco Studio
+.idea/
+.vscode/
+.deveco/
+.hvigor/
+hvigor/
+**/.cxx/
+
+# Build outputs
+build/
+entry/build/
+proxy_core/build/
+*.hap
+*.app
+
+# Node
+node_modules/
+oh_modules/
+**/oh_modules/
+.pnpm-store/
+
+# Go
+*.exe
+*.so
+*.dylib
+proxy_core/src/flclash/libflclash.so
+proxy_core/src/flclash/core/
+proxy_core/src/flclash/core
+proxy_core/src/flclash/gvisor-ohos/
+!proxy_core/src/flclash/core/README.md
+!proxy_core/src/flclash/gvisor-ohos/README.md
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# 本地环境
+.env
+*.local
+
+# 本地参考仓库（各自保留独立 Git 历史，不嵌套进 ClashH 主仓库）
+references/
+repo/
+mihomo/
+mihomo-plugin/

@@ -1,0 +1,8 @@
+{
+  "name": "libflclash.so",
+  "version": "0.1.0",
+  "description": "mihomo 内核 NAPI 桥",
+  "main": "Index.d.ts",
+  "author": "",
+  "license": "GPL-3.0"
+}

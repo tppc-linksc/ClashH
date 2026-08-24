@@ -1,0 +1,7 @@
+{
+  "files": ["**/*.ets", "**/*.ts"],
+  "ignore": ["**/oh_modules/**", "**/build/**", "**/.preview/**"],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "warn"
+  }
+}

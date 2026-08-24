@@ -1,0 +1,14 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "ClashH 入口模块（UI 主界面）",
+  "main": "",
+  "author": "",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "proxy_core": "file:../proxy_core"
+  },
+  "devDependencies": {
+    "@ohos/hypium": "1.0.19"
+  }
+}

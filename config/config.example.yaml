@@ -1,0 +1,49 @@
+# ClashH 示例配置
+# 实际配置由订阅生成，此文件仅作参考
+
+# HTTP/SOCKS5 混合端口
+mixed-port: 7890
+
+# 允许局域网连接
+allow-lan: false
+
+# 代理模式: rule / global / direct
+mode: rule
+
+# 日志级别: debug / info / warning / error
+log-level: info
+
+# IPv6
+ipv6: false
+
+# 外部控制器（本地 API）
+external-controller: 127.0.0.1:9090
+
+# TUN 配置（由应用启动时覆盖）
+tun:
+  enable: true
+  stack: system
+  auto-route: false
+  auto-detect-interface: false
+  dns-hijack:
+    - any:53
+
+# DNS 配置
+dns:
+  enable: true
+  listen: 0.0.0.0:53
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+  fallback:
+    - 8.8.8.8
+    - 1.1.1.1
+
+# 代理组示例
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+      - DIRECT

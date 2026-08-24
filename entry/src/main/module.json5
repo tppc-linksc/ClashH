@@ -1,0 +1,50 @@
+{
+  "module": {
+    "name": "entry",
+    "type": "entry",
+    "description": "$string:module_desc",
+    "mainElement": "EntryAbility",
+    "deviceTypes": ["phone", "tablet", "2in1"],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "abilities": [
+      {
+        "name": "EntryAbility",
+        "srcEntry": "./ets/entryability/EntryAbility.ets",
+        "description": "$string:EntryAbility_desc",
+        "icon": "$media:layered_image",
+        "label": "$string:EntryAbility_label",
+        "startWindowIcon": "$media:foreground_box_cat_large",
+        "startWindowBackground": "$color:start_window_background",
+        "orientation": "auto_rotation_restricted",
+        "supportWindowMode": ["floating", "split", "fullscreen"],
+        "recoverable": true,
+        "minWindowWidth": 332,
+        "minWindowHeight": 498,
+        "exported": true,
+        "skills": [
+          {
+            "entities": ["entity.system.home"],
+            "actions": ["action.system.home"]
+          }
+        ]
+      }
+    ],
+    "extensionAbilities": [
+      {
+        "name": "ClashVpnAbility",
+        "srcEntry": "./ets/entryability/ClashVpnAbility.ets",
+        "description": "$string:ClashVpnAbility_desc",
+        "icon": "$media:layered_image",
+        "label": "$string:ClashVpnAbility_label",
+        "type": "vpn",
+        "exported": false
+      }
+    ],
+    "requestPermissions": [
+      { "name": "ohos.permission.INTERNET" },
+      { "name": "ohos.permission.CAMERA", "reason": "$string:perm_camera_reason", "usedScene": { "abilities": ["EntryAbility"], "when": "inuse" } }
+    ]
+  }
+}

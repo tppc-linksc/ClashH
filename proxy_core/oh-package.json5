@@ -1,0 +1,14 @@
+{
+  "name": "proxy_core",
+  "version": "1.0.0",
+  "description": "ClashH 原生核心模块（NAPI 桥 + mihomo 内核封装）",
+  "main": "Index.ets",
+  "author": "",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "libflclash.so": "file:./src/main/cpp/types/libflclash"
+  },
+  "devDependencies": {
+    "@ohos/hypium": "1.0.19"
+  }
+}

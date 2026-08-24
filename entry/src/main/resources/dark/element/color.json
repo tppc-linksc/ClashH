@@ -1,0 +1,20 @@
+{
+  "color": [
+    { "name": "start_window_background", "value": "#FF000000" },
+    { "name": "background", "value": "#FF000000" },
+    { "name": "container_background", "value": "#1A1A1A" },
+    { "name": "list_item_background_color", "value": "#1AFFFFFF" },
+    { "name": "divider", "value": "#1AFFFFFF" },
+    { "name": "text_primary", "value": "#E6FDFDFD" },
+    { "name": "text_secondary", "value": "#99FDFDFD" },
+    { "name": "text_tertiary", "value": "#66FDFDFD" },
+    { "name": "brand", "value": "#FF759BF5" },
+    { "name": "success", "value": "#FF1B8A5A" },
+    { "name": "warning", "value": "#FFFFBF52" },
+    { "name": "error", "value": "#FFE84026" },
+    { "name": "speed_up_icon", "value": "#FFF7980A" },
+    { "name": "speed_down_icon", "value": "#FF759BF5" },
+    { "name": "selected_background", "value": "#1476FFF9" },
+    { "name": "button_container_background", "value": "#1AFFFFFF" }
+  ]
+}
