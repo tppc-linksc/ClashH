@@ -62,6 +62,12 @@ interface TunnelStateResponse {
   profileId: string;
 }
 
+/** QueryProxyGroup 响应：ClashBox 内核返回裸代理表，这里包装出真实模式。 */
+interface ProxiesEnvelope {
+  proxies: Record<string, Object>;
+  mode: string;
+}
+
 interface RuntimeResponse {
   milliseconds: number;
 }
@@ -220,6 +226,8 @@ class ClashVpnServiceImpl extends ClashVpnService {
   private startedAt: number = 0;
   private optionState: OptionState = {};
   private loadedProfileId: string = '';
+  /** 内核当前实际生效的代理模式，供 UI 展示，避免把默认值误当成真实值。 */
+  private currentMode: string = '';
 
   constructor(context: common.Context) {
     super(context);
@@ -334,7 +342,7 @@ class ClashVpnServiceImpl extends ClashVpnService {
       case RpcMethod.QueryTrafficTotal:
         return getTotalTraffic();
       case RpcMethod.QueryProxyGroup:
-        return getProxies();
+        return this.queryProxyGroups();
       case RpcMethod.QueryProviders:
         return getExternalProviders();
       case RpcMethod.ChangeProxy:
@@ -420,6 +428,21 @@ class ClashVpnServiceImpl extends ClashVpnService {
     }
   }
 
+  /** 包装代理表并附带真实运行模式，兼容仓库源码版 { proxies, mode } 与 ClashBox 裸表两种结构。 */
+  private queryProxyGroups(): string {
+    const raw: string = getProxies();
+    try {
+      const parsed = JSON.parse(raw) as Record<string, Object>;
+      if (parsed['proxies'] !== undefined) {
+        return raw;
+      }
+      return JSON.stringify({ proxies: parsed, mode: this.currentMode || 'rule' } as ProxiesEnvelope);
+    } catch (error) {
+      console.warn(TAG, '包装代理列表失败: ' + (error as Error).message);
+      return raw;
+    }
+  }
+
   private async startCore(): Promise<string> {
     await this.init();
     if (this.running) {
@@ -479,8 +502,13 @@ class ClashVpnServiceImpl extends ClashVpnService {
     }
     // 参考内核并不导出 setState，运行参数应在加载配置时合并，
     // 避免 VPN 扩展因引用不存在的 NAPI 函数而整个加载失败。
+    let appliedMode = typeof rawConfig['mode'] === 'string' ? String(rawConfig['mode']).toLowerCase() : 'rule';
+    if (appliedMode !== 'rule' && appliedMode !== 'global' && appliedMode !== 'direct') {
+      appliedMode = 'rule';
+    }
     if (this.optionState.mode) {
       rawConfig['mode'] = this.optionState.mode;
+      appliedMode = this.optionState.mode;
     }
     if (this.optionState.mixedPort && this.optionState.mixedPort >= 1024 && this.optionState.mixedPort <= 65535) {
       rawConfig['mixed-port'] = this.optionState.mixedPort;
@@ -530,6 +558,7 @@ class ClashVpnServiceImpl extends ClashVpnService {
     if (this.optionState.dns) {
       await updateDns(this.optionState.dns);
     }
+    this.currentMode = appliedMode;
     this.loadedProfileId = profileId;
     return '{"status":"ok"}';
   }

@@ -8,6 +8,7 @@ export struct ResourcesPage {
   @State geoIp: string = '未安装';
   @State geoSite: string = '未安装';
   @State mmdb: string = '未安装';
+  @State asn: string = '未安装';
 
   aboutToAppear(): void {
     this.refreshStatus();
@@ -15,10 +16,12 @@ export struct ResourcesPage {
 
   async refreshStatus(): Promise<void> {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    const geoDir = `${context.filesDir}/geo`;
-    this.geoIp = await this.fileStatus(`${geoDir}/GeoIP.dat`);
-    this.geoSite = await this.fileStatus(`${geoDir}/GeoSite.dat`);
-    this.mmdb = await this.fileStatus(`${geoDir}/Country.mmdb`);
+    // ClashVpnAbility.ensureGeoResources 会把资源复制到 filesDir 根目录。
+    const homeDir = context.filesDir;
+    this.geoIp = await this.fileStatus(`${homeDir}/GeoIP.dat`);
+    this.geoSite = await this.fileStatus(`${homeDir}/GeoSite.dat`);
+    this.mmdb = await this.fileStatus(`${homeDir}/geoip.metadb`);
+    this.asn = await this.fileStatus(`${homeDir}/ASN.mmdb`);
   }
 
   async fileStatus(path: string): Promise<string> {
@@ -69,6 +72,17 @@ export struct ResourcesPage {
                 Text('MMDB').fontSize(15).fontWeight(FontWeight.Medium)
                 Text('IP 库 mmdb 格式').fontSize(12).fontColor($r('app.color.text_tertiary'))
                 Text(this.mmdb).fontSize(11).fontColor($r('app.color.text_tertiary'))
+              }.layoutWeight(1).alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center)
+              Text('由内核管理').fontSize(11).fontColor($r('app.color.text_tertiary'))
+            }.padding(14).width('100%').backgroundColor($r('app.color.container_background')).borderRadius(10)
+          }
+          ListItem() {
+            Row({ space: 12 }) {
+              SymbolGlyph($r('sys.symbol.globe_and_keyboard')).fontSize(24).fontColor([$r('app.color.brand')])
+              Column({ space: 2 }) {
+                Text('ASN').fontSize(15).fontWeight(FontWeight.Medium)
+                Text('自治系统号数据库').fontSize(12).fontColor($r('app.color.text_tertiary'))
+                Text(this.asn).fontSize(11).fontColor($r('app.color.text_tertiary'))
               }.layoutWeight(1).alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center)
               Text('由内核管理').fontSize(11).fontColor($r('app.color.text_tertiary'))
             }.padding(14).width('100%').backgroundColor($r('app.color.container_background')).borderRadius(10)

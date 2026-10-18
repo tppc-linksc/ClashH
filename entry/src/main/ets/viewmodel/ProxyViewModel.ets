@@ -5,6 +5,7 @@ import { ClashClient, RpcMethod, ProxyGroup, Proxy, isProxyGroup } from 'proxy_c
 import { common } from '@kit.AbilityKit';
 import { ProfileRepository, ProfileStoreData } from '../service/ProfileRepository';
 import { ensureCoreProfile } from '../service/CoreSession';
+import { saveRuntimeMode } from '../service/RuntimeSettings';
 
 /** /proxies 响应结构 */
 interface ProxiesResponse {
@@ -21,6 +22,7 @@ export class ProxyViewModel {
   private client: ClashClient;
   private repository: ProfileRepository | null = null;
   private profileUid: string = '';
+  private context: common.Context | null = null;
 
   /** 代理组列表 */
   groups: ProxyGroup[] = [];
@@ -48,6 +50,7 @@ export class ProxyViewModel {
 
   /** 刷新代理列表 */
   async refresh(context: common.UIAbilityContext): Promise<void> {
+    this.context = context;
     this.loading = true;
     this.error = '';
     this.notify();
@@ -79,6 +82,10 @@ export class ProxyViewModel {
     try {
       await this.client.request(RpcMethod.SetOptionState, [JSON.stringify({ mode })]);
       this.mode = mode;
+      // 持久化，避免重启后回到配置文件里的模式。
+      if (this.context) {
+        await saveRuntimeMode(this.context, mode);
+      }
       this.notify();
     } catch (error) {
       console.error('[ProxyViewModel] 模式切换失败:', (error as Error).message);

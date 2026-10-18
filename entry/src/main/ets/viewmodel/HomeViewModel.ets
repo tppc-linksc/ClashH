@@ -26,6 +26,8 @@ export interface HomeState {
   currentProfile: string;
   /** 内核版本 */
   version: string;
+  /** 当前代理模式 rule / global / direct */
+  mode: string;
 }
 
 /** 流量响应（RPC 返回 JSON 解析后） */
@@ -45,6 +47,7 @@ interface VersionResponse {
 
 interface ProxiesResponse {
   proxies?: Record<string, ProxyStatus>;
+  mode?: string;
 }
 
 interface ProxyStatus {
@@ -63,7 +66,7 @@ export class HomeViewModel {
   private lastState: HomeState = {
     connected: false, connecting: false,
     up: 0, down: 0, upTotal: 0, downTotal: 0,
-    currentNode: '', currentProfile: '', version: ''
+    currentNode: '', currentProfile: '', version: '', mode: ''
   };
 
   /** 状态监听回调 */
@@ -135,7 +138,7 @@ export class HomeViewModel {
         up: this.lastState.up, down: this.lastState.down,
         upTotal: this.lastState.upTotal, downTotal: this.lastState.downTotal,
         currentNode: this.lastState.currentNode, currentProfile,
-        version: this.lastState.version
+        version: this.lastState.version, mode: this.lastState.mode
       });
     } catch (e) {
       console.error('[HomeViewModel] 核对 VPN 状态失败:', (e as Error).message);
@@ -161,7 +164,8 @@ export class HomeViewModel {
         downTotal: total.down,
         currentNode,
         currentProfile,
-        version: version.version
+        version: version.version,
+        mode: proxies.mode ?? this.lastState.mode
       });
     } catch (e) {
       console.warn('[HomeViewModel] 流量或节点信息暂不可用: ' + (e as Error).message);
@@ -172,7 +176,7 @@ export class HomeViewModel {
     this.emit({
       connected: false, connecting: false,
       up: 0, down: 0, upTotal: 0, downTotal: 0,
-      currentNode: '', currentProfile, version: ''
+      currentNode: '', currentProfile, version: '', mode: this.lastState.mode
     });
   }
 

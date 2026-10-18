@@ -10,9 +10,12 @@ interface LogItem {
   payload: string;
 }
 
+/** 内核日志字段：实际 .so 推 logLevel/payload/time，旧实现推 type/payload，这里做兼容。 */
 interface CoreLogMessage {
-  type: string;
-  payload: string;
+  type?: string;
+  logLevel?: string;
+  payload?: string;
+  time?: number | string;
 }
 
 @Component
@@ -60,10 +63,11 @@ export struct LogsPage {
     }
     try {
       const message = JSON.parse(result.result) as CoreLogMessage;
+      const levelText: string = message.logLevel ?? message.type ?? 'info';
       const item: LogItem = {
-        level: this.normalizeLevel(message.type),
-        time: this.currentTime(),
-        payload: message.payload
+        level: this.normalizeLevel(levelText),
+        time: this.messageTime(message.time),
+        payload: message.payload ?? ''
       };
       const updated = this.items.concat(item);
       this.items = updated.length > 500 ? updated.slice(updated.length - 500) : updated;
@@ -85,6 +89,18 @@ export struct LogsPage {
     if (level === 'info') return 1;
     if (level === 'warning') return 2;
     return 3;
+  }
+
+  /** 内核 time 为 Unix 秒；兼容 RFC3339 字符串，缺失时用本地时间。 */
+  private messageTime(value: number | string | undefined): string {
+    if (typeof value === 'number' && value > 0) {
+      const date = new Date(value * 1000);
+      return `${this.twoDigits(date.getHours())}:${this.twoDigits(date.getMinutes())}:${this.twoDigits(date.getSeconds())}`;
+    }
+    if (typeof value === 'string' && value.length >= 19) {
+      return value.substring(11, 19);
+    }
+    return this.currentTime();
   }
 
   private currentTime(): string {
