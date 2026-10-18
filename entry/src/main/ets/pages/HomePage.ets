@@ -380,7 +380,7 @@ export struct HomePage {
         }
 
         // 版本信息
-        Text('mihomo ' + (this.state.version || '--'))
+        Text(this.state.version || '--')
           .fontSize(11).fontColor($r('app.color.text_tertiary')).width('100%').textAlign(TextAlign.Center)
       }
       .padding(16)

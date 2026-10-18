@@ -142,6 +142,7 @@ export class ProfileRepository {
       uid: profile.uid,
       type: profile.type,
       name: profile.name,
+      desc: profile.desc,
       file: profile.file,
       url: profile.url,
       updated: Date.now(),

@@ -4,17 +4,7 @@
 import { ProxyViewModel } from '../viewmodel/ProxyViewModel';
 import { ProxyGroup, Proxy } from 'proxy_core';
 import { common } from '@kit.AbilityKit';
-import { BreakpointFunction2D, isWidePhoneBreakpoint } from '../common/breakpoint/BreakPointSystem2D';
-
-// 卡片网格列数：窄屏 1 列，宽屏 2 列
-const GroupColumns = BreakpointFunction2D<number>({
-  ['xs']: { ['hsm']: 1, ['hmd']: 1, ['hlg']: 1 },
-  ['sm']: { ['hsm']: 1, ['hmd']: 1, ['hlg']: 1 },
-  ['wide']: { ['hsm']: 1, ['hmd']: 1, ['hlg']: 1 },
-  ['md']: { ['hsm']: 2, ['hmd']: 1, ['hlg']: 1 },
-  ['lg']: { ['hsm']: 2, ['hmd']: 2, ['hlg']: 2 },
-  ['xl']: { ['hsm']: 2, ['hmd']: 2, ['hlg']: 2 },
-});
+import { isWidePhoneBreakpoint } from '../common/breakpoint/BreakPointSystem2D';
 
 // 延迟着色阈值（ms）：移动网络下跨境节点普遍在 200-600ms，阈值放宽避免满屏红色。
 const DELAY_GOOD_MS = 280;

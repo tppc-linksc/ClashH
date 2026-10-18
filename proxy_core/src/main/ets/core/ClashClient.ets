@@ -229,6 +229,8 @@ export class ClashClient {
   /** 连接关闭：所有未完成请求失败 */
   private handleClose(): void {
     this.client = null;
+    // 丢弃半包，避免重连后旧数据与新响应拼在一起。
+    this.buffer = '';
     this.rejectPendingRequests('连接已关闭');
     this.setState(ClashClientState.Disconnected);
   }
