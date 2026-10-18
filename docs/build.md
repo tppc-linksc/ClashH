@@ -39,6 +39,13 @@ GO_OHOS=/path/to/go-ohos/bin/go
 2. File -> Sync and Refresh Project
 3. Build -> Build Hap(s)/APP(s)
 
+### 签名配置
+
+仓库不跟踪本机签名配置：`build-profile.json5` 已被 `.gitignore` 忽略，模板见根目录 `build-profile.example.json5`。
+首次打开项目时，复制模板为 `build-profile.json5`，再在 DevEco Studio 中配置签名
+（File -> Project Structure -> Signing Configs，可自动生成或导入本地证书）。
+签名证书、口令等材料不要提交到仓库。
+
 ## 常见问题
 
 ### Q: 没有 go-ohos 能否构建？

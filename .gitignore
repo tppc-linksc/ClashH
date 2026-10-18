@@ -40,6 +40,9 @@ proxy_core/src/flclash/gvisor-ohos/
 .env
 *.local
 
+# 本机签名配置（含签名材料），模板见 build-profile.example.json5
+/build-profile.json5
+
 # 本地参考仓库（各自保留独立 Git 历史，不嵌套进 ClashH 主仓库）
 references/
 repo/

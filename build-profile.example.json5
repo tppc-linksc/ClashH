@@ -1,0 +1,44 @@
+// ClashH 构建配置模板（不含签名材料，可安全入库）
+//
+// 使用方法：
+//   1. 复制本文件为 build-profile.json5（该文件已被 .gitignore 忽略）
+//   2. 用 DevEco Studio 打开项目，在 File -> Project Structure -> Signing Configs
+//      中配置自动签名或导入本地证书；DevEco 会把 signingConfigs 写回 build-profile.json5
+//   3. 不要提交 build-profile.json5 —— 签名证书、口令等材料只保留在本机
+{
+  "app": {
+    // 签名配置由本机 DevEco Studio 生成/维护，模板中留空。
+    "signingConfigs": [],
+    "products": [
+      {
+        "name": "default",
+        "compatibleSdkVersion": "6.1.0(23)",
+        "targetSdkVersion": "6.1.1(24)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      { "name": "debug" },
+      { "name": "release" }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        { "name": "default", "applyToProducts": ["default"] }
+      ]
+    },
+    {
+      "name": "proxy_core",
+      "srcPath": "./proxy_core"
+    }
+  ]
+}
