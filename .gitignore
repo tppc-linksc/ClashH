@@ -5,6 +5,8 @@
 .hvigor/
 hvigor/
 **/.cxx/
+# hvigor 构建时自动生成（proxy_core HAR 版本信息）
+proxy_core/BuildProfile.ets
 
 # Build outputs
 build/
