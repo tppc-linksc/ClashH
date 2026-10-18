@@ -12,7 +12,7 @@ interface SettingItem {
   icon: Resource;
   title: string;
   value: string;
-  action: 'language' | 'theme' | 'dns' | 'port' | 'about';
+  action: 'language' | 'theme' | 'dns' | 'port' | 'domestic' | 'about';
 }
 
 interface SettingsEditorArgs {
@@ -62,6 +62,7 @@ const KEY_LANGUAGE = 'language';
 const KEY_THEME = 'theme';
 const KEY_DNS = 'dns';
 const KEY_PORT = 'mixedPort';
+const KEY_DOMESTIC_DIRECT = 'domesticDirect';
 
 @Component
 export struct SettingsPage {
@@ -69,6 +70,7 @@ export struct SettingsPage {
   @State theme: string = 'auto';
   @State customDns: string = '';
   @State mixedPort: string = '7890';
+  @State domesticDirect: boolean = true;
   @State dnsInput: string = '';
   @State portInput: string = '';
 
@@ -91,6 +93,7 @@ export struct SettingsPage {
       this.theme = String(await this.store.get(KEY_THEME, 'auto'));
       this.customDns = String(await this.store.get(KEY_DNS, ''));
       this.mixedPort = String(await this.store.get(KEY_PORT, '7890'));
+      this.domesticDirect = Boolean(await this.store.get(KEY_DOMESTIC_DIRECT, true));
       this.applyTheme(this.theme);
     } catch (e) {
       console.error('[Settings] 加载失败:', (e as Error).message);
@@ -126,6 +129,7 @@ export struct SettingsPage {
       case 'theme': this.pickTheme(); break;
       case 'dns': this.openDnsEditor(); break;
       case 'port': this.openPortEditor(); break;
+      case 'domestic': this.toggleDomesticDirect(); break;
       case 'about': this.showAbout(); break;
     }
   }
@@ -321,6 +325,24 @@ export struct SettingsPage {
     }
   }
 
+  /** 开启/关闭“国内直连规则”；连接中通过 SetOptionState 让内核重新加载配置。 */
+  async toggleDomesticDirect(): Promise<void> {
+    this.domesticDirect = !this.domesticDirect;
+    await this.saveKey(KEY_DOMESTIC_DIRECT, this.domesticDirect);
+    const label = this.domesticDirect ? '已开启国内直连规则' : '已关闭国内直连规则';
+    if (this.client.getState() !== ClashClientState.Connected) {
+      this.toast(label + '，连接后生效');
+      return;
+    }
+    try {
+      await this.client.request(RpcMethod.SetOptionState,
+        [JSON.stringify({ domesticDirect: this.domesticDirect })], 30000);
+      this.toast(label);
+    } catch (error) {
+      this.toast('应用失败: ' + (error as Error).message);
+    }
+  }
+
   private async applyCoreSettings(): Promise<void> {
     if (this.client.getState() !== ClashClientState.Connected) {
       return;
@@ -364,6 +386,7 @@ export struct SettingsPage {
       [
         { icon: $r('sys.symbol.wifi_router_fill'), title: 'DNS 设置', value: this.customDns === '' ? '默认' : this.customDns, action: 'dns' },
         { icon: $r('sys.symbol.connection'), title: '端口设置', value: this.mixedPort, action: 'port' },
+        { icon: $r('sys.symbol.network_acceleration'), title: '国内直连规则', value: this.domesticDirect ? '开启' : '关闭', action: 'domestic' },
       ],
       [
         { icon: $r('sys.symbol.info_circle_fill'), title: '关于', value: 'v0.1.0', action: 'about' },

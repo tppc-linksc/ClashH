@@ -874,6 +874,10 @@ function buildYaml(nodes: JsonNode[], group: JsonNode): string {
   lines.push('  - "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve"');
   lines.push('  - "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"');
   lines.push('  - "IP-CIDR6,fc00::/7,DIRECT,no-resolve"');
+  // 国内直连：分享链接生成的配置没有订阅规则，不补这一段的话国内流量会全部走代理。
+  lines.push('  - "DOMAIN-SUFFIX,cn,DIRECT"');
+  lines.push('  - "GEOSITE,cn,DIRECT"');
+  lines.push('  - "GEOIP,CN,DIRECT"');
   lines.push(`  - ${quote('MATCH,' + GROUP_NAME)}`);
   lines.push('');
   return lines.join('\n');

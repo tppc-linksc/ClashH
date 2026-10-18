@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 
 const STORE_NAME = 'clashh_settings';
+const KEY_DOMESTIC_DIRECT = 'domesticDirect';
 
 /** 从设置页持久化、在连接时下发给内核的运行参数。 */
 export interface RuntimeCoreSettings {
@@ -9,6 +10,8 @@ export interface RuntimeCoreSettings {
   dns: string;
   /** rule / global / direct；空串表示沿用配置文件里的 mode。 */
   mode: string;
+  /** 规则模式下是否补国内直连规则。 */
+  domesticDirect: boolean;
 }
 
 function normalizeMode(value: string): string {
@@ -23,15 +26,17 @@ export async function loadRuntimeSettings(context: common.Context): Promise<Runt
     const portValue = await store.get('mixedPort', 7890);
     const dnsValue = await store.get('dns', '');
     const modeValue = await store.get('mode', '');
+    const domesticValue = await store.get(KEY_DOMESTIC_DIRECT, true);
     const port = Number(portValue);
     return {
       mixedPort: port >= 1024 && port <= 65535 ? port : 7890,
       dns: String(dnsValue).trim(),
-      mode: normalizeMode(String(modeValue))
+      mode: normalizeMode(String(modeValue)),
+      domesticDirect: Boolean(domesticValue)
     };
   } catch (error) {
     console.warn('[RuntimeSettings] 读取设置失败: ' + (error as Error).message);
-    return { mixedPort: 7890, dns: '', mode: '' };
+    return { mixedPort: 7890, dns: '', mode: '', domesticDirect: true };
   }
 }
 

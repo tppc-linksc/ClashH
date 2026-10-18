@@ -76,6 +76,8 @@ interface OptionState {
   mode?: string;
   mixedPort?: number;
   dns?: string;
+  /** 规则模式下是否补国内直连规则；undefined 视为开启。 */
+  domesticDirect?: boolean;
 }
 
 interface ConfigExtendedParams {
@@ -394,10 +396,12 @@ class ClashVpnServiceImpl extends ClashVpnService {
         this.optionState = {
           mode: options.mode ?? this.optionState.mode,
           mixedPort: options.mixedPort ?? this.optionState.mixedPort,
-          dns: options.dns ?? this.optionState.dns
+          dns: options.dns ?? this.optionState.dns,
+          domesticDirect: options.domesticDirect ?? this.optionState.domesticDirect
         };
         const shouldReload = this.coreInitialized && this.loadedProfileId.length > 0 &&
-          (options.mode !== undefined || options.mixedPort !== undefined);
+          (options.mode !== undefined || options.mixedPort !== undefined ||
+            options.domesticDirect !== undefined);
         if (shouldReload) {
           await this.loadProfile(this.loadedProfileId);
         } else if (this.coreInitialized && options.dns) {
@@ -536,6 +540,11 @@ class ClashVpnServiceImpl extends ClashVpnService {
       rawConfig['sniffer'] = defaultSnifferConfig();
     }
 
+    // 国内直连规则：只在配置本身没有 CN 直连规则时补齐，尊重订阅作者的分流规则。
+    if (this.optionState.domesticDirect !== false) {
+      this.injectDomesticDirectRules(rawConfig);
+    }
+
     const selectedMap: Record<string, string> = await this.loadSelectedMap(profileId);
     const params: ConfigExtendedParams = {
       'is-patch': false,
@@ -561,6 +570,45 @@ class ClashVpnServiceImpl extends ClashVpnService {
     this.currentMode = appliedMode;
     this.loadedProfileId = profileId;
     return '{"status":"ok"}';
+  }
+
+  /** 在 MATCH 之前补国内直连规则；已有 CN 规则时跳过，避免覆盖订阅作者的分流意图。 */
+  private injectDomesticDirectRules(config: Record<string, Object | undefined>): void {
+    const value = config['rules'];
+    if (value === undefined || value === null) {
+      return;
+    }
+    const rules = value as string[];
+    if (!Array.isArray(rules) || this.hasDomesticDirectRule(rules)) {
+      return;
+    }
+    let matchIndex = -1;
+    for (let i = 0; i < rules.length; i++) {
+      const rule = rules[i];
+      if (typeof rule === 'string' && rule.trim().toUpperCase().startsWith('MATCH')) {
+        matchIndex = i;
+        break;
+      }
+    }
+    const insertAt = matchIndex >= 0 ? matchIndex : rules.length;
+    rules.splice(insertAt, 0, 'DOMAIN-SUFFIX,cn,DIRECT', 'GEOSITE,cn,DIRECT', 'GEOIP,CN,DIRECT');
+    config['rules'] = rules;
+    console.info(TAG, '已注入国内直连规则，共 ' + rules.length + ' 条');
+  }
+
+  private hasDomesticDirectRule(rules: string[]): boolean {
+    for (let i = 0; i < rules.length; i++) {
+      const rule = rules[i];
+      if (typeof rule !== 'string') {
+        continue;
+      }
+      const normalized = rule.toUpperCase().replace(/\s+/g, '');
+      if (normalized.indexOf('GEOSITE,CN') === 0 || normalized.indexOf('GEOIP,CN') === 0 ||
+        normalized.indexOf('DOMAIN-SUFFIX,CN') === 0 || normalized.indexOf('DOMAIN,CN') === 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private async loadSelectedMap(profileId: string): Promise<Record<string, string>> {

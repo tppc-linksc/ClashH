@@ -12,6 +12,7 @@ ClashH 是为 **HarmonyOS NEXT（6.1.0+ / API 23+）** 打造的原生代理客�
 - **系统 VPN**：`VpnExtensionAbility` 创建虚拟网卡（TUN），流量接管
 - **多端适配**：优先适配 400–599vp 阔直板手机（Pura X View），兼顾普通手机、平板与 2in1
 - **完整 UI**：深浅色主题、中英文国际化、平板/手机自适应导航
+- **国内分流**：规则模式下自动补齐 CN 直连规则（设置中可关闭），首页可快捷切换规则/全局/直连，并在重启后保持选择
 
 设备优先级与真机验收见 [docs/device-priority.md](docs/device-priority.md)。
 
