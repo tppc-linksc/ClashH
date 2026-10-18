@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
 import { Profile, ProfileType } from 'proxy_core';
+import { convertShareLinks, isShareLinkPayload, ShareLinkResult } from './ShareLinkParser';
 
 export interface ProfileStoreData {
   profiles: Profile[];
@@ -60,6 +61,25 @@ export class ProfileRepository {
     return profile;
   }
 
+  /**
+   * 从分享链接导入（ss / vmess / vless / trojan / hysteria2 / tuic）。
+   * 链接本身不含订阅地址，转换出的 YAML 按本地配置保存。
+   */
+  async importFromShareLinks(raw: string): Promise<Profile> {
+    const result: ShareLinkResult = convertShareLinks(raw);
+    const uid = this.newUid();
+    const profile: Profile = {
+      uid,
+      type: ProfileType.Local,
+      name: this.nameFromShareLinks(result),
+      file: `${uid}.yaml`,
+      desc: `分享链接导入 · ${result.count} 个节点`,
+      updated: Date.now()
+    };
+    await this.saveNewProfile(profile, result.yaml);
+    return profile;
+  }
+
   async importFromFile(uri: string): Promise<Profile> {
     await this.ensureDirectory();
     const uid = this.newUid();
@@ -82,7 +102,10 @@ export class ProfileRepository {
         throw new Error('配置文件不能超过 10 MB');
       }
       const content = await fileIo.readText(destination);
-      this.validateConfigContent(content);
+      const normalized = this.normalizeSubscription(content);
+      if (normalized !== content) {
+        await this.writeText(destination, normalized);
+      }
       const profile: Profile = {
         uid,
         type: ProfileType.Local,
@@ -236,13 +259,27 @@ export class ProfileRepository {
         throw new Error('服务器返回 HTTP ' + response.responseCode);
       }
       const content = String(response.result);
-      this.validateConfigContent(content);
-      return content;
+      return this.normalizeSubscription(content);
     } catch (error) {
       throw new Error('下载配置失败: ' + (error as Error).message);
     } finally {
       request.destroy();
     }
+  }
+
+  /** 订阅正文可能是 Clash YAML，也可能是（base64 编码的）分享链接列表，后者先转成 YAML。 */
+  private normalizeSubscription(content: string): string {
+    if (content.length === 0) {
+      throw new Error('配置内容为空');
+    }
+    if (content.length > MAX_CONFIG_SIZE) {
+      throw new Error('配置文件不能超过 10 MB');
+    }
+    if (isShareLinkPayload(content)) {
+      return convertShareLinks(content).yaml;
+    }
+    this.validateConfigContent(content);
+    return content;
   }
 
   private validateConfigContent(content: string): void {
@@ -323,6 +360,13 @@ export class ProfileRepository {
     const withoutScheme = url.replace(/^https?:\/\//i, '');
     const host = withoutScheme.split('/')[0];
     return host.length > 0 ? host : '远程配置';
+  }
+
+  private nameFromShareLinks(result: ShareLinkResult): string {
+    if (result.count === 1 && result.firstName.length > 0) {
+      return result.firstName;
+    }
+    return result.firstName.length > 0 ? `${result.firstName} 等 ${result.count} 个节点` : '分享链接配置';
   }
 
   private nameFromUri(uri: string): string {

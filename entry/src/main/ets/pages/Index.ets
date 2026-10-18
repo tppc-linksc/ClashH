@@ -1,6 +1,8 @@
 // Index：使用 HarmonyOS 6.1 原生 HdsTabs 沉浸材质底部胶囊。
 
 import { DividerMode, HdsTabs, hdsMaterial } from '@kit.UIDesignKit';
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { isPhoneBreakpoint } from '../common/breakpoint/BreakPointSystem2D';
 import { HomePage } from './HomePage';
 import { ProxyPage } from './ProxyPage';
 import { ConfigurationPage } from './ConfigurationPage';
@@ -9,6 +11,7 @@ import { MorePage } from './MorePage';
 @Entry
 @Component
 struct Index {
+  @StorageLink('currentWidthBreakpoint') widthBp: number = 1;
   @State currentIndex: number = 0;
 
   /** 使用系统 Symbol，选中态与文字共享品牌色。 */
@@ -63,12 +66,19 @@ struct Index {
     .barFloatingStyle({
       barWidth: { smallWidth: 300, mediumWidth: 360, largeWidth: 424 },
       barSideMargin: 16,
-      barBottomMargin: 24,
+      // HdsTabs 已会自动避让系统底部手势区。手机端再保留 24vp
+      // 会变成双重间距，因此只留一个较紧凑的光学边距。
+      // xs / sm / 阔直板手机均使用紧凑底边距；600vp 起按大屏处理。
+      barBottomMargin: isPhoneBreakpoint(this.widthBp) ? 8 : 24,
       gradientMask: { maskColor: Color.Transparent, maskHeight: 88 },
       adaptToHandedness: false,
       systemMaterialEffect: {
         materialType: hdsMaterial.MaterialType.IMMERSIVE,
-        materialLevel: hdsMaterial.MaterialLevel.EXQUISITE
+        // EXQUISITE 在手机模拟器上会产生胶囊底部的矩形采样块；
+        // 真机保留精致材质，模拟器使用系统中性材质。
+        materialLevel: deviceInfo.productModel.toLowerCase().includes('emulator')
+          ? hdsMaterial.MaterialLevel.GENTLE
+          : hdsMaterial.MaterialLevel.EXQUISITE
       },
       thermoCtrl: true,
       barOpacity: 0.80

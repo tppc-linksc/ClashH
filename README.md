@@ -10,8 +10,14 @@ ClashH 是为 **HarmonyOS NEXT（6.1.0+ / API 23+）** 打造的原生代理客�
 - **纯鸿蒙原生**：ArkTS + ArkUI 3.0 声明式 UI，Stage 模型
 - **mihomo 内核**：Go 交叉编译为 `libflclash.so`，经 NAPI 嵌入应用进程
 - **系统 VPN**：`VpnExtensionAbility` 创建虚拟网卡（TUN），流量接管
-- **多端适配**：优先适配 MatePad 12.2 与 MatePad mini，兼顾手机与 2in1
+- **多端适配**：优先适配 400–599vp 阔直板手机（Pura X View），兼顾普通手机、平板与 2in1
 - **完整 UI**：深浅色主题、中英文国际化、平板/手机自适应导航
+
+设备优先级与真机验收见 [docs/device-priority.md](docs/device-priority.md)。
+
+### 当前使用状态
+
+已在作者自用鸿蒙手机上持续使用一段时间：扫码导入配置、建立 VPN 连接及连接后的基础使用均可正常进行，主流程相对稳定。细节功能和更多设备、网络场景尚未系统测试。
 
 ## 技术架构
 
@@ -86,7 +92,8 @@ cd proxy_core/src/flclash
 - [x] 数据模型（Proxy/Connection/Profile/Config）
 - [x] UI 框架（断点自适应 + 深浅色 + 中英文）
 - [x] 内核编译脚本（go-ohos / openharmony-arm64）
-- [ ] TUN 实机联调（VpnExtensionAbility + sing_tun）
+- [x] TUN 真机基础验证（扫码导入、连接及基础使用正常）
+- [ ] 细节功能与更多设备、网络场景的系统测试
 - [x] 订阅导入/更新流程
 - [x] 连接列表 / 日志实时流
 - [ ] 上架与签名

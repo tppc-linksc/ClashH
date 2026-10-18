@@ -4,6 +4,7 @@ import { VpnExtensionAbility, socket } from '@kit.NetworkKit';
 import { Want, common } from '@kit.AbilityKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { parseYaml } from '../utils/YamlParser';
+import { isOwnVpnActive } from '../service/VpnNetworkStatus';
 import {
   AppState,
   SocketProxyService,
@@ -57,6 +58,8 @@ interface DelayRequest {
 
 interface TunnelStateResponse {
   running: boolean;
+  /** 内核当前已应用的配置 ID，空串表示尚未加载。UI 用它避免重复 Load。 */
+  profileId: string;
 }
 
 interface RuntimeResponse {
@@ -92,6 +95,82 @@ interface GeoXUrls {
 
 interface GeoResource {
   fileName: string;
+}
+
+/**
+ * TUN 默认参数。
+ * 内核的 overwriteConfig 会把 tun.stack / tun.dns-hijack 等字段无条件覆盖成这里传过去的值，
+ * 不传就会退化成 Go 零值：stack=gVisor、dns-hijack 为空。
+ * dns-hijack 为空时内核只兜底劫持 172.19.0.2:53，
+ * 应用直连 8.8.8.8 一类硬编码 DNS 的查询不会被接管（X / YouTube 客户端就是这么做的）。
+ */
+function defaultTunConfig(): Record<string, Object> {
+  const tun: Record<string, Object> = {};
+  tun['enable'] = true;
+  tun['stack'] = 'Mixed';
+  tun['dns-hijack'] = ['any:53', 'tcp://any:53'];
+  // 路由与网卡由鸿蒙 VpnExtension 管理，内核不要再自己接管。
+  tun['auto-route'] = false;
+  tun['auto-detect-interface'] = false;
+  // 与 ClashVpnService 的 VpnConfig.mtu 保持一致。
+  tun['mtu'] = 1400;
+  // 与 ClashBox 参考实现保持一致，减少与已验证配置的偏差。
+  tun['endpoint-independent-nat'] = false;
+  return tun;
+}
+
+/** DNS 默认参数。仅在配置自身没有 dns 段时使用。 */
+function defaultDnsConfig(): Record<string, Object> {
+  const dns: Record<string, Object> = {};
+  dns['enable'] = true;
+  dns['listen'] = '0.0.0.0:1053';
+  dns['ipv6'] = false;
+  dns['enhanced-mode'] = 'fake-ip';
+  dns['fake-ip-range'] = '198.18.0.1/16';
+  dns['fake-ip-filter'] = ['*.lan', '*.local', '+.msftconnecttest.com', '+.msftncsi.com'];
+  dns['default-nameserver'] = ['223.5.5.5', '119.29.29.29'];
+  dns['nameserver'] = ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query'];
+  // 节点域名必须用直连 DNS 解析，否则解析请求会绕回隧道自身。
+  dns['proxy-server-nameserver'] = ['https://doh.pub/dns-query', '223.5.5.5'];
+  return dns;
+}
+
+/**
+ * 嗅探默认参数。仅在配置自身没有 sniffer 段时使用。
+ * 走 fake-ip 时很多流量（尤其 QUIC）只带 IP，不嗅探域名就无法命中域名规则。
+ */
+function defaultSnifferConfig(): Record<string, Object> {
+  // 预编译核心的 RawSniffingConfig.Ports 是 []string；数字会使整份配置加载失败。
+  const tcp: Record<string, Object> = {};
+  tcp['ports'] = ['443', '80', '8080', '8443'];
+  const udp: Record<string, Object> = {};
+  udp['ports'] = ['443'];
+  const sniff: Record<string, Object> = {};
+  sniff['HTTP'] = tcp;
+  sniff['TLS'] = tcp;
+  sniff['QUIC'] = udp;
+
+  const sniffer: Record<string, Object> = {};
+  sniffer['enable'] = true;
+  sniffer['parse-pure-ip'] = true;
+  sniffer['override-destination'] = false;
+  sniffer['sniff'] = sniff;
+  sniffer['skip-domain'] = ['Mijia Cloud', '+.push.apple.com'];
+  return sniffer;
+}
+
+/** 以 base 为底、defaults 补齐缺失键。配置自己写了什么就以配置为准。 */
+function withDefaults(base: Object | undefined, defaults: Record<string, Object>): Record<string, Object> {
+  const merged: Record<string, Object> = defaults;
+  if (base === undefined || base === null) {
+    return merged;
+  }
+  const existing = base as Record<string, Object>;
+  const keys = Object.keys(existing);
+  for (const key of keys) {
+    merged[key] = existing[key];
+  }
+  return merged;
 }
 
 interface ProfileSelectionEntry {
@@ -247,7 +326,11 @@ class ClashVpnServiceImpl extends ClashVpnService {
       case RpcMethod.QueryTrafficNow:
         return getTraffic();
       case RpcMethod.QueryTunnelState:
-        return JSON.stringify({ running: this.running } as TunnelStateResponse);
+        const systemVpnActive = await isOwnVpnActive();
+        return JSON.stringify({
+          running: this.running && systemVpnActive !== false,
+          profileId: this.loadedProfileId
+        } as TunnelStateResponse);
       case RpcMethod.QueryTrafficTotal:
         return getTotalTraffic();
       case RpcMethod.QueryProxyGroup:
@@ -340,7 +423,12 @@ class ClashVpnServiceImpl extends ClashVpnService {
   private async startCore(): Promise<string> {
     await this.init();
     if (this.running) {
-      return '{"status":"ok","running":true}';
+      const systemVpnActive = await isOwnVpnActive();
+      if (systemVpnActive !== false) {
+        return JSON.stringify({ status: 'ok', running: true });
+      }
+      console.warn(TAG, '内核仍标记为运行，但系统 VPN 网卡已消失；重建隧道');
+      await this.stopVpn();
     }
     const tunFd = await this.getTunFd();
     if (tunFd < 0) {
@@ -359,7 +447,7 @@ class ClashVpnServiceImpl extends ClashVpnService {
       this.running = true;
       this.startedAt = Date.now();
       AppState.setCoreRunning(true);
-      return '{"status":"ok","running":true}';
+      return JSON.stringify({ status: 'ok', running: true });
     } catch (error) {
       await super.stopVpn();
       throw new Error((error as Error).message);
@@ -409,12 +497,24 @@ class ClashVpnServiceImpl extends ClashVpnService {
       rawConfig['geox-url'] = geoXUrls;
     }
 
+    // TUN 字段被内核无条件覆盖，必须每次都完整下发。
+    rawConfig['tun'] = withDefaults(rawConfig['tun'], defaultTunConfig());
+    // 配置自带 dns / sniffer 时尊重配置，只有缺失时才补默认值。
+    const hasOwnDns = rawConfig['dns'] !== undefined && rawConfig['dns'] !== null;
+    if (!hasOwnDns) {
+      rawConfig['dns'] = defaultDnsConfig();
+    }
+    if (rawConfig['sniffer'] === undefined || rawConfig['sniffer'] === null) {
+      rawConfig['sniffer'] = defaultSnifferConfig();
+    }
+
     const selectedMap: Record<string, string> = await this.loadSelectedMap(profileId);
     const params: ConfigExtendedParams = {
       'is-patch': false,
       'is-compatible': true,
       'selected-map': selectedMap,
-      'override-dns': false,
+      // 配置自带 dns 段时交给内核沿用配置本身的 DNS，否则用上面补的默认值覆盖。
+      'override-dns': !hasOwnDns,
       'test-url': DEFAULT_TEST_URL
     };
     const updateRequest: UpdateConfigRequest = {

@@ -40,6 +40,7 @@ export class ClashClient {
   private stateCallbacks: ((state: ClashClientState) => void)[] = [];
 
   private state: ClashClientState = ClashClientState.Disconnected;
+  private connectingPromise: Promise<void> | null = null;
   private decoder: util.TextDecoder;
 
   private constructor() {
@@ -66,6 +67,18 @@ export class ClashClient {
    */
   async connect(context: common.Context, socketName: string = 'ClashH.sock'): Promise<void> {
     if (this.state === ClashClientState.Connected) return;
+    if (this.connectingPromise) {
+      return this.connectingPromise;
+    }
+    this.connectingPromise = this.openConnection(context, socketName);
+    try {
+      await this.connectingPromise;
+    } finally {
+      this.connectingPromise = null;
+    }
+  }
+
+  private async openConnection(context: common.Context, socketName: string): Promise<void> {
     this.setState(ClashClientState.Connecting);
 
     this.socketPath = `${context.filesDir}/${socketName}`;

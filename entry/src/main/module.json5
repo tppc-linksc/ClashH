@@ -23,6 +23,8 @@
         "minWindowWidth": 332,
         "minWindowHeight": 498,
         "exported": true,
+        // 手机上 taskKeeping 不受支持；VPN 连接期间仅申请数据传输长时任务。
+        "backgroundModes": ["dataTransfer"],
         "skills": [
           {
             "entities": ["entity.system.home"],
@@ -44,6 +46,8 @@
     ],
     "requestPermissions": [
       { "name": "ohos.permission.INTERNET" },
+      { "name": "ohos.permission.GET_NETWORK_INFO" },
+      { "name": "ohos.permission.KEEP_BACKGROUND_RUNNING" },
       { "name": "ohos.permission.CAMERA", "reason": "$string:perm_camera_reason", "usedScene": { "abilities": ["EntryAbility"], "when": "inuse" } }
     ]
   }

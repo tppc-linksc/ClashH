@@ -2,17 +2,20 @@
 // 布局：问候 -> 连接控制 -> 流量 -> 当前节点
 
 import { HomeViewModel, HomeState } from '../viewmodel/HomeViewModel';
-import { BreakpointFunction2D } from '../common/breakpoint/BreakPointSystem2D';
+import { BreakpointFunction2D, isWidePhoneBreakpoint } from '../common/breakpoint/BreakPointSystem2D';
 import { vpnExtension } from '@kit.NetworkKit';
 import { Want, common } from '@kit.AbilityKit';
 import { ClashClient, ClashClientState, RpcMethod } from 'proxy_core';
 import { ProfileRepository, ProfileStoreData } from '../service/ProfileRepository';
 import { loadRuntimeSettings, RuntimeCoreSettings } from '../service/RuntimeSettings';
+import { backgroundKeeper } from '../service/BackgroundKeeper';
+import { VpnSessionStore } from '../service/VpnSessionStore';
 
 // 首页内容宽度：窄屏满宽，宽屏居中限宽
 const PageWidth = BreakpointFunction2D<string>({
   ['xs']: { ['hsm']: '100%', ['hmd']: '100%', ['hlg']: '100%' },
   ['sm']: { ['hsm']: '100%', ['hmd']: '100%', ['hlg']: '100%' },
+  ['wide']: { ['hsm']: '100%', ['hmd']: '100%', ['hlg']: '100%' },
   ['md']: { ['hsm']: '100%', ['hmd']: '100%', ['hlg']: '100%' },
   ['lg']: { ['hsm']: '720vp', ['hmd']: '720vp', ['hlg']: '720vp' },
   ['xl']: { ['hsm']: '840vp', ['hmd']: '840vp', ['hlg']: '840vp' },
@@ -22,9 +25,14 @@ const PageWidth = BreakpointFunction2D<string>({
 export struct HomePage {
   @StorageLink('currentWidthBreakpoint') widthBp: number = 1;
   @StorageLink('currentHeightBreakpoint') heightBp: number = 1;
+  @StorageLink('ClashH.foregroundEpoch') @Watch('onForegroundEpoch') foregroundEpoch: number = 0;
+  @StorageLink('ClashH.appForeground') @Watch('onAppForegroundChanged') appForeground: boolean = true;
+  @StorageLink('ClashH.networkLossEpoch') @Watch('onNetworkLoss') networkLossEpoch: number = 0;
   @Prop @Watch('onActiveChanged') active: boolean = true;
 
   private vm: HomeViewModel = new HomeViewModel();
+  private recovering: boolean = false;
+  private lastRecoveryAttempt: number = 0;
   @State state: HomeState = {
     connected: false, connecting: false,
     up: 0, down: 0, upTotal: 0, downTotal: 0,
@@ -32,17 +40,27 @@ export struct HomePage {
   };
 
   aboutToAppear(): void {
-    this.vm.onStateChange = (s: HomeState) => { this.state = s; };
-    if (this.active) {
+    this.vm.onStateChange = (s: HomeState) => {
+      this.state = {
+        connected: s.connected, connecting: this.state.connecting,
+        up: s.up, down: s.down, upTotal: s.upTotal, downTotal: s.downTotal,
+        currentNode: s.currentNode, currentProfile: s.currentProfile, version: s.version
+      };
+    };
+    if (this.active && this.appForeground) {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       this.vm.start(context);
+    }
+    if (this.appForeground) {
+      this.recoverIfNeeded();
     }
   }
 
   onActiveChanged(): void {
-    if (this.active) {
+    if (this.active && this.appForeground) {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       this.vm.start(context);
+      this.recoverIfNeeded();
     } else {
       this.vm.stop();
     }
@@ -52,7 +70,61 @@ export struct HomePage {
     this.vm.stop();
   }
 
+  onForegroundEpoch(): void {
+    if (this.appForeground) {
+      this.recoverIfNeeded();
+    }
+  }
+
+  onAppForegroundChanged(): void {
+    if (this.appForeground) {
+      if (this.active) {
+        const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+        this.vm.start(context);
+      }
+      this.recoverIfNeeded();
+    } else {
+      this.vm.stop();
+    }
+  }
+
+  onNetworkLoss(): void {
+    this.recoverIfNeeded();
+  }
+
+  /** 回到 App 后先核对系统 VPN，再依据上次用户意图自动恢复。 */
+  private async recoverIfNeeded(): Promise<void> {
+    if (this.recovering || this.state.connecting) {
+      return;
+    }
+    this.recovering = true;
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      await this.vm.refreshNow();
+      if (this.state.connected) {
+        await backgroundKeeper.start(context);
+        return;
+      }
+      if (Date.now() - this.lastRecoveryAttempt < (this.appForeground ? 5000 : 30000)) {
+        return;
+      }
+      const intent = await new VpnSessionStore(context).read();
+      if (intent.desired && intent.profileId.length > 0) {
+        this.lastRecoveryAttempt = Date.now();
+        console.warn('[HomePage] VPN 已断开，尝试自动恢复');
+        await this.startVpn(true);
+      }
+    } catch (error) {
+      console.error('[HomePage] 自动恢复检查失败: ' + (error as Error).message);
+    } finally {
+      this.recovering = false;
+    }
+  }
+
   async onToggleConnect(): Promise<void> {
+    if (this.recovering || this.state.connecting) {
+      return;
+    }
     if (this.state.connected) {
       await this.stopVpn();
     } else {
@@ -60,7 +132,7 @@ export struct HomePage {
     }
   }
 
-  private async startVpn(): Promise<void> {
+  private async startVpn(automatic: boolean = false): Promise<void> {
     this.updateConnecting(true);
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     const client = ClashClient.getInstance();
@@ -70,21 +142,29 @@ export struct HomePage {
       if (store.current.length === 0) {
         throw new Error('请先导入并选择一个配置');
       }
+      await new VpnSessionStore(context).write({ desired: true, profileId: store.current });
       await vpnExtension.startVpnExtensionAbility(want);
       await this.connectCore(client, context);
       const runtimeSettings: RuntimeCoreSettings = await loadRuntimeSettings(context);
       await client.request(RpcMethod.SetOptionState, [JSON.stringify(runtimeSettings)]);
       await client.request(RpcMethod.Load, [store.current], 15000);
       await client.request(RpcMethod.StartClash, [], 15000);
+      // 官方长时任务仅接受 UIAbilityContext；用于保持应用后台运行，VPN 扩展由系统单独管理。
+      await backgroundKeeper.start(context);
       await this.vm.refreshNow();
     } catch (e) {
       await client.disconnect();
+      await backgroundKeeper.stop(context);
       try {
         await vpnExtension.stopVpnExtensionAbility(this.createVpnWant(context, false));
       } catch (stopError) {
         console.warn('[HomePage] 启动失败后的清理未完成: ' + (stopError as Error).message);
       }
-      this.toast('启动失败: ' + (e as Error).message);
+      if (!automatic) {
+        this.toast('启动失败: ' + (e as Error).message);
+      } else {
+        console.error('[HomePage] 自动恢复失败: ' + (e as Error).message);
+      }
     } finally {
       this.updateConnecting(false);
     }
@@ -95,6 +175,13 @@ export struct HomePage {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     const client = ClashClient.getInstance();
     try {
+      await new VpnSessionStore(context).write({ desired: false, profileId: '' });
+    } catch (error) {
+      this.toast('保存断开状态失败: ' + (error as Error).message);
+      this.updateConnecting(false);
+      return;
+    }
+    try {
       if (client.getState() === ClashClientState.Connected) {
         await client.request(RpcMethod.StopClash, [], 10000);
       }
@@ -102,6 +189,7 @@ export struct HomePage {
       this.toast('停止内核失败: ' + (e as Error).message);
     } finally {
       await client.disconnect();
+      await backgroundKeeper.stop(context);
       try {
         await vpnExtension.stopVpnExtensionAbility(this.createVpnWant(context, false));
       } catch (error) {
@@ -128,7 +216,7 @@ export struct HomePage {
 
   private async connectCore(client: ClashClient, context: common.UIAbilityContext): Promise<void> {
     let lastMessage = 'VPN 服务尚未就绪';
-    for (let attempt = 0; attempt < 20; attempt++) {
+    for (let attempt = 0; attempt < 8; attempt++) {
       try {
         await client.connect(context);
         return;
@@ -206,53 +294,100 @@ export struct HomePage {
         .backgroundColor($r('app.color.container_background'))
         .alignItems(VerticalAlign.Center)
 
-        // 实时流量卡片
-        Column({ space: 10 }) {
-          Row() {
-            Text($r('app.string.home_traffic'))
-              .fontSize(14).fontWeight(FontWeight.Medium).layoutWeight(1)
-            Row() {
-              Text($r('app.string.home_total'))
-                .fontSize(11).fontColor($r('app.color.text_tertiary'))
-              Text(': ' + this.formatBytes(this.state.upTotal + this.state.downTotal))
-                .fontSize(11).fontColor($r('app.color.text_tertiary'))
-            }
-          }.width('100%')
-          Row() {
-            Column({ space: 4 }) {
-              Text(this.formatSpeed(this.state.up))
-                .fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.speed_up_icon'))
-              Text($r('app.string.home_upload'))
-                .fontSize(11).fontColor($r('app.color.text_tertiary'))
-            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-            Column({ space: 4 }) {
-              Text(this.formatSpeed(this.state.down))
-                .fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.speed_down_icon'))
-              Text($r('app.string.home_download'))
-                .fontSize(11).fontColor($r('app.color.text_tertiary'))
-            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-          }.width('100%')
+        // 阔直板手机优先使用横向信息带；普通手机保持更易读的纵向卡片。
+        if (isWidePhoneBreakpoint(this.widthBp)) {
+          Row({ space: 12 }) {
+            this.TrafficCard()
+            this.CurrentNodeCard(true)
+          }.width('100%').alignItems(VerticalAlign.Center)
+        } else {
+          this.TrafficCard()
+          this.CurrentNodeCard(false)
         }
-        .padding(16).width('100%').backgroundColor($r('app.color.container_background')).borderRadius(16)
-        .alignItems(HorizontalAlign.Start)
-
-        // 当前节点
-        Row() {
-          Text($r('app.string.home_current_node'))
-            .fontSize(14).fontWeight(FontWeight.Medium).layoutWeight(1)
-          Text(this.state.currentNode || '--')
-            .fontSize(13).fontColor($r('app.color.text_secondary'))
-        }
-        .padding(16).width('100%').backgroundColor($r('app.color.container_background')).borderRadius(16)
-        .alignItems(VerticalAlign.Center)
 
         // 版本信息
         Text('mihomo ' + (this.state.version || '--'))
           .fontSize(11).fontColor($r('app.color.text_tertiary')).width('100%').textAlign(TextAlign.Center)
       }
-      .padding(16).width('100%')
+      .padding(16)
+      .width(PageWidth(this.widthBp, this.heightBp))
+      .constraintSize({ maxWidth: 840 })
     }
     .width('100%').height('100%').backgroundColor($r('app.color.background'))
     .align(Alignment.Top).scrollBar(BarState.Off)
+  }
+
+  @Builder
+  private TrafficCard() {
+    Column({ space: 10 }) {
+      Row({ space: 4 }) {
+        Text($r('app.string.home_traffic'))
+          .fontSize(14).fontWeight(FontWeight.Medium).layoutWeight(1)
+        // 资源对象不能直接和字符串拼接（会变成 [object Object]），标题与数值分开渲染。
+        Text($r('app.string.home_total'))
+          .fontSize(11).fontColor($r('app.color.text_tertiary'))
+          .maxLines(1)
+        Text(this.formatBytes(this.state.upTotal + this.state.downTotal))
+          .fontSize(11).fontColor($r('app.color.text_tertiary'))
+          .maxLines(1)
+      }.width('100%').alignItems(VerticalAlign.Center)
+      Row() {
+        Column({ space: 4 }) {
+          Text(this.formatSpeed(this.state.up))
+            .fontSize(isWidePhoneBreakpoint(this.widthBp) ? 17 : 20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.speed_up_icon'))
+            .maxLines(1)
+          Text($r('app.string.home_upload'))
+            .fontSize(11).fontColor($r('app.color.text_tertiary'))
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Column({ space: 4 }) {
+          Text(this.formatSpeed(this.state.down))
+            .fontSize(isWidePhoneBreakpoint(this.widthBp) ? 17 : 20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.speed_down_icon'))
+            .maxLines(1)
+          Text($r('app.string.home_download'))
+            .fontSize(11).fontColor($r('app.color.text_tertiary'))
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+      }.width('100%')
+    }
+    .padding(16)
+    .width(isWidePhoneBreakpoint(this.widthBp) ? undefined : '100%')
+    .layoutWeight(isWidePhoneBreakpoint(this.widthBp) ? 3 : 0)
+    .backgroundColor($r('app.color.container_background'))
+    .borderRadius(16)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private CurrentNodeCard(compact: boolean) {
+    if (compact) {
+      Column({ space: 8 }) {
+        SymbolGlyph($r('sys.symbol.wifi_router_fill'))
+          .fontSize(22).fontColor([$r('app.color.brand')])
+        Text($r('app.string.home_current_node'))
+          .fontSize(12).fontWeight(FontWeight.Medium)
+        Text(this.state.currentNode || '--')
+          .fontSize(12).fontColor($r('app.color.text_secondary'))
+          .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .padding(14)
+      .layoutWeight(2)
+      .justifyContent(FlexAlign.Center)
+      .backgroundColor($r('app.color.container_background'))
+      .borderRadius(16)
+    } else {
+      Row() {
+        Text($r('app.string.home_current_node'))
+          .fontSize(14).fontWeight(FontWeight.Medium).layoutWeight(1)
+        Text(this.state.currentNode || '--')
+          .fontSize(13).fontColor($r('app.color.text_secondary'))
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .padding(16).width('100%')
+      .backgroundColor($r('app.color.container_background')).borderRadius(16)
+      .alignItems(VerticalAlign.Center)
+    }
   }
 }

@@ -4,16 +4,21 @@
 import { ProxyViewModel } from '../viewmodel/ProxyViewModel';
 import { ProxyGroup, Proxy } from 'proxy_core';
 import { common } from '@kit.AbilityKit';
-import { BreakpointFunction2D } from '../common/breakpoint/BreakPointSystem2D';
+import { BreakpointFunction2D, isWidePhoneBreakpoint } from '../common/breakpoint/BreakPointSystem2D';
 
 // 卡片网格列数：窄屏 1 列，宽屏 2 列
 const GroupColumns = BreakpointFunction2D<number>({
   ['xs']: { ['hsm']: 1, ['hmd']: 1, ['hlg']: 1 },
   ['sm']: { ['hsm']: 1, ['hmd']: 1, ['hlg']: 1 },
+  ['wide']: { ['hsm']: 1, ['hmd']: 1, ['hlg']: 1 },
   ['md']: { ['hsm']: 2, ['hmd']: 1, ['hlg']: 1 },
   ['lg']: { ['hsm']: 2, ['hmd']: 2, ['hlg']: 2 },
   ['xl']: { ['hsm']: 2, ['hmd']: 2, ['hlg']: 2 },
 });
+
+// 延迟着色阈值（ms）：移动网络下跨境节点普遍在 200-600ms，阈值放宽避免满屏红色。
+const DELAY_GOOD_MS = 280;
+const DELAY_FAIR_MS = 660;
 
 @Component
 export struct ProxyPage {
@@ -121,32 +126,17 @@ export struct ProxyPage {
   build() {
     Column({ space: 0 }) {
       // 顶栏：模式切换 + 搜索
-      Column({ space: 8 }) {
-        // 模式切换
-        Row({ space: 8 }) {
-          ForEach(this.modes, (mode: string) => {
-            Text(this.modeLabel(mode))
-              .fontSize(13)
-              .fontColor(this.mode === mode ? Color.White : $r('app.color.text_secondary'))
-              .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-              .backgroundColor(this.mode === mode ? $r('app.color.brand') : $r('app.color.button_container_background'))
-              .borderRadius(16)
-              .onClick(() => { this.vm.setMode(mode); })
-          })
-        }
-
-        // 搜索框
-        TextInput({ placeholder: $r('app.string.proxy_search'), text: this.keyword })
-          .width('100%')
-          .height(36)
-          .fontSize(13)
-          .onChange((v: string) => {
-            this.vm.keyword = v;
-            this.keyword = v;
-          })
+      if (isWidePhoneBreakpoint(this.widthBp)) {
+        Row({ space: 10 }) {
+          this.ModeSelector()
+          this.SearchField()
+        }.padding(12).width('100%').alignItems(VerticalAlign.Center)
+      } else {
+        Column({ space: 8 }) {
+          this.ModeSelector()
+          this.SearchField()
+        }.padding(12).width('100%')
       }
-      .padding(12)
-      .width('100%')
 
       // 代理组列表
       if (this.loading) {
@@ -198,6 +188,36 @@ export struct ProxyPage {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.background'))
+  }
+
+  @Builder
+  private ModeSelector() {
+    Row({ space: isWidePhoneBreakpoint(this.widthBp) ? 4 : 8 }) {
+      ForEach(this.modes, (mode: string) => {
+        Text(this.modeLabel(mode))
+          .fontSize(13)
+          .fontColor(this.mode === mode ? Color.White : $r('app.color.text_secondary'))
+          .padding({ left: isWidePhoneBreakpoint(this.widthBp) ? 11 : 14,
+            right: isWidePhoneBreakpoint(this.widthBp) ? 11 : 14,
+            top: 6, bottom: 6 })
+          .backgroundColor(this.mode === mode ? $r('app.color.brand') : $r('app.color.button_container_background'))
+          .borderRadius(16)
+          .onClick(() => { this.vm.setMode(mode); })
+      })
+    }
+  }
+
+  @Builder
+  private SearchField() {
+    TextInput({ placeholder: $r('app.string.proxy_search'), text: this.keyword })
+      .width(isWidePhoneBreakpoint(this.widthBp) ? undefined : '100%')
+      .layoutWeight(isWidePhoneBreakpoint(this.widthBp) ? 1 : 0)
+      .height(36)
+      .fontSize(13)
+      .onChange((v: string) => {
+        this.vm.keyword = v;
+        this.keyword = v;
+      })
   }
 
   emptyMessage(): string {
@@ -310,14 +330,14 @@ export struct ProxyPage {
     .onClick(() => { this.selectProxy(group.name, name); })
   }
 
-  /** 延迟颜色：绿/黄/红 */
+  /** 延迟颜色：绿/黄/红。阈值见 DELAY_GOOD_MS / DELAY_FAIR_MS。 */
   delayColor(name: string): ResourceColor {
     const p = this.proxies[name];
     if (!p || !p.history || p.history.length === 0) return $r('app.color.text_tertiary');
     const delay = p.history[p.history.length - 1].delay;
     if (delay < 0) return $r('app.color.error');
-    if (delay < 150) return $r('app.color.success');
-    if (delay < 400) return $r('app.color.warning');
+    if (delay <= DELAY_GOOD_MS) return $r('app.color.success');
+    if (delay <= DELAY_FAIR_MS) return $r('app.color.warning');
     return $r('app.color.error');
   }
 }

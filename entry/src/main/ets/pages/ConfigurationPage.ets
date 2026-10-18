@@ -7,12 +7,15 @@ import { scanBarcode, scanCore } from '@kit.ScanKit';
 import { picker } from '@kit.CoreFileKit';
 import { abilityAccessCtrl, common } from '@kit.AbilityKit';
 import { ProfileRepository, ProfileStoreData } from '../service/ProfileRepository';
-import { normalizeProfileInput } from '../service/ProfileInput';
+import { isHttpSubscription, normalizeProfileInput } from '../service/ProfileInput';
+import { isShareLinkPayload } from '../service/ShareLinkParser';
 import { ensureCoreProfile } from '../service/CoreSession';
+import { isWidePhoneBreakpoint } from '../common/breakpoint/BreakPointSystem2D';
 
 
 @Component
 export struct ConfigurationPage {
+  @StorageLink('currentWidthBreakpoint') widthBp: number = 1;
   @Prop @Watch('onActiveChanged') active: boolean = false;
   private client: ClashClient = ClashClient.getInstance();
   private pathStack: NavPathStack = new NavPathStack();
@@ -48,7 +51,7 @@ export struct ConfigurationPage {
     }
   }
 
-  /** 解析扫描结果：提取 URL（兼容 ss:// vmess:// vless:// trojan:// hysteria:// 纯 URL） */
+  /** 解析扫描结果：兼容订阅地址与 ss/vmess/vless/trojan/hysteria/tuic 分享链接 */
   parseScanResult(rawValue: string): string {
     return normalizeProfileInput(rawValue);
   }
@@ -78,9 +81,9 @@ export struct ConfigurationPage {
         if (url) {
           this.urlInput = url;
           this.showImport = true;
-          this.toast('已识别，自动填入 URL');
+          this.toast('已识别，点击“导入”完成添加');
         } else {
-          this.toast('未识别到有效订阅链接');
+          this.toast('未识别到有效的订阅或节点链接');
         }
       } else {
         this.toast('当前设备不支持系统扫码服务');
@@ -91,16 +94,24 @@ export struct ConfigurationPage {
     }
   }
 
-  /** 从链接导入 */
+  /** 从链接导入：HTTP(S) 走订阅下载，节点分享链接在本地转成 Clash 配置 */
   async importFromUrl(): Promise<void> {
-    const url = this.urlInput.trim();
-    if (!url) {
-      this.toast('请输入或扫码获取 URL');
+    const value = normalizeProfileInput(this.urlInput);
+    if (!value) {
+      this.toast('请输入或扫码获取链接');
+      return;
+    }
+    const subscription = isHttpSubscription(value);
+    if (!subscription && !isShareLinkPayload(value)) {
+      this.toast('无法识别：请填写订阅地址或节点分享链接');
       return;
     }
     this.loading = true;
     try {
-      const profile = await this.getRepository().importFromUrl(url);
+      const repository = this.getRepository();
+      const profile = subscription
+        ? await repository.importFromUrl(value)
+        : await repository.importFromShareLinks(value);
       await this.activateProfile(profile.uid, '已导入并启用: ' + profile.name);
       this.urlInput = '';
       this.showImport = false;
@@ -136,7 +147,7 @@ export struct ConfigurationPage {
       await this.getRepository().setCurrent(uid);
       this.currentUid = uid;
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      this.client = await ensureCoreProfile(context, uid);
+      this.client = await ensureCoreProfile(context, uid, true);
       this.toast(successMessage);
     } catch (e) {
       // current 已写入时仍然保留选择，代理页会提供明确的重试入口。
@@ -150,7 +161,7 @@ export struct ConfigurationPage {
       await this.getRepository().update(profile);
       if (profile.uid === this.currentUid) {
         const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-        this.client = await ensureCoreProfile(context, profile.uid);
+        this.client = await ensureCoreProfile(context, profile.uid, true);
       }
       this.toast('已更新');
       await this.refresh();
@@ -301,13 +312,16 @@ export struct ConfigurationPage {
         Button('添加')
           .height(30).fontSize(13).type(ButtonType.Capsule)
           .onClick(() => { this.showImport = !this.showImport; })
-      }.padding(12).width('100%').alignItems(VerticalAlign.Center).height(48)
+      }
+      .padding({ left: isWidePhoneBreakpoint(this.widthBp) ? 16 : 12,
+        right: isWidePhoneBreakpoint(this.widthBp) ? 16 : 12 })
+      .width('100%').alignItems(VerticalAlign.Center).height(48)
 
       if (this.showImport) {
         Column({ space: 8 }) {
           // URL 输入 + 扫码 + 导入
           Row({ space: 8 }) {
-            TextInput({ placeholder: '输入或扫码获取订阅链接', text: this.urlInput })
+            TextInput({ placeholder: '订阅地址或节点分享链接', text: this.urlInput })
               .layoutWeight(1).height(36).fontSize(13)
               .onChange((v: string) => { this.urlInput = v; })
             Button('扫码')
@@ -324,7 +338,11 @@ export struct ConfigurationPage {
             .backgroundColor($r('app.color.button_container_background'))
             .fontColor($r('app.color.text_primary'))
             .onClick(() => this.importFromFile())
-        }.padding(12).width('100%')
+        }
+        .padding({ left: isWidePhoneBreakpoint(this.widthBp) ? 16 : 12,
+          right: isWidePhoneBreakpoint(this.widthBp) ? 16 : 12,
+          top: 12, bottom: 12 })
+        .width('100%')
       }
 
       if (this.profiles.length === 0) {
@@ -338,7 +356,12 @@ export struct ConfigurationPage {
               this.ProfileCard(p)
             }
           }, (p: Profile) => p.uid)
-        }.padding({ left: 12, right: 12, top: 12, bottom: 104 }).layoutWeight(1).scrollBar(BarState.Off)
+        }
+        .padding({ left: isWidePhoneBreakpoint(this.widthBp) ? 16 : 12,
+          right: isWidePhoneBreakpoint(this.widthBp) ? 16 : 12,
+          top: 12, bottom: 104 })
+        .constraintSize({ maxWidth: 720 })
+        .layoutWeight(1).scrollBar(BarState.Off)
       }
     }.width('100%').height('100%').backgroundColor($r('app.color.background'))
   }

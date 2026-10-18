@@ -17,6 +17,8 @@ interface BreakpointItem {
 const WIDTH_BP: BreakpointItem[] = [
   { name: 'xs', size: 0 },
   { name: 'sm', size: 320 },
+  // 阔直板手机专属档：Pura X View 当前窗口为 440vp × 744vp。
+  { name: 'wide', size: 400 },
   { name: 'md', size: 600 },
   { name: 'lg', size: 840 },
   { name: 'xl', size: 1000 },

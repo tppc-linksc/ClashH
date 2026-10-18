@@ -6,6 +6,7 @@ import { RequestsPage } from './RequestsPage';
 import { ResourcesPage } from './ResourcesPage';
 import { SettingsPage } from './SettingsPage';
 import { AboutPage } from './AboutPage';
+import { isWidePhoneBreakpoint } from '../common/breakpoint/BreakPointSystem2D';
 
 /** 工具子页路由名。 */
 type ToolRoute = 'connections' | 'logs' | 'requests' | 'resources' | 'settings' | 'about';
@@ -24,6 +25,7 @@ interface MoreGroup {
 
 @Component
 export struct MorePage {
+  @StorageLink('currentWidthBreakpoint') widthBp: number = 1;
   private pathStack: NavPathStack = new NavPathStack();
 
   private groups: MoreGroup[] = [
@@ -64,15 +66,16 @@ export struct MorePage {
         Text('工具').fontSize(20).fontWeight(FontWeight.Bold).layoutWeight(1)
       }.padding(12).width('100%').height(48).alignItems(VerticalAlign.Center)
 
-      List({ space: 8 }) {
-        ForEach(this.groups, (group: MoreGroup) => {
-          ListItem() {
+      Scroll() {
+        Column({ space: 12 }) {
+          ForEach(this.groups, (group: MoreGroup) => {
             Column({ space: 8 }) {
               Text(group.title)
                 .fontSize(12)
                 .fontColor($r('app.color.text_tertiary'))
                 .width('100%')
                 .padding({ left: 4 })
+              // 工具入口一行一个，自上而下排列。
               Column() {
                 ForEach(group.items, (item: MoreItem) => {
                   this.EntryRow(item)
@@ -83,13 +86,22 @@ export struct MorePage {
               .borderRadius(16)
               .clip(true)
             }
-          }
-        }, (group: MoreGroup) => group.title)
+            .width('100%')
+            .alignItems(HorizontalAlign.Start)
+            .margin({ top: 8 })
+          }, (group: MoreGroup) => group.title)
+        }
+        .padding({ left: isWidePhoneBreakpoint(this.widthBp) ? 16 : 12,
+          right: isWidePhoneBreakpoint(this.widthBp) ? 16 : 12,
+          bottom: 100 })
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
       }
-      .padding({ left: 12, right: 12, bottom: 100 })
       .width('100%')
       .constraintSize({ maxWidth: 840 })
       .layoutWeight(1)
+      // Scroll 内容不足一屏时默认垂直居中，这里必须顶部对齐。
+      .align(Alignment.Top)
       .scrollBar(BarState.Off)
     }
     .width('100%')
@@ -127,4 +139,5 @@ export struct MorePage {
       this.pathStack.pushPathByName(item.route, null);
     })
   }
+
 }
