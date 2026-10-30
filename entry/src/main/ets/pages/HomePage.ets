@@ -7,7 +7,7 @@ import { vpnExtension } from '@kit.NetworkKit';
 import { Want, common } from '@kit.AbilityKit';
 import { ClashClient, ClashClientState, RpcMethod } from 'proxy_core';
 import { ProfileRepository, ProfileStoreData } from '../service/ProfileRepository';
-import { loadRuntimeSettings, RuntimeCoreSettings, saveRuntimeMode } from '../service/RuntimeSettings';
+import { loadRuntimeSettings, RuntimeCoreSettings } from '../service/RuntimeSettings';
 import { backgroundKeeper } from '../service/BackgroundKeeper';
 import { VpnSessionStore } from '../service/VpnSessionStore';
 
@@ -36,7 +36,7 @@ export struct HomePage {
   @State state: HomeState = {
     connected: false, connecting: false,
     up: 0, down: 0, upTotal: 0, downTotal: 0,
-    currentNode: '', currentProfile: '', version: '', mode: 'rule'
+    currentNode: '', currentProfile: '', version: ''
   };
 
   aboutToAppear(): void {
@@ -44,30 +44,15 @@ export struct HomePage {
       this.state = {
         connected: s.connected, connecting: this.state.connecting,
         up: s.up, down: s.down, upTotal: s.upTotal, downTotal: s.downTotal,
-        currentNode: s.currentNode, currentProfile: s.currentProfile, version: s.version,
-        mode: s.mode.length > 0 ? s.mode : this.state.mode
+        currentNode: s.currentNode, currentProfile: s.currentProfile, version: s.version
       };
     };
-    this.loadSavedMode();
     if (this.active && this.appForeground) {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       this.vm.start(context);
     }
     if (this.appForeground) {
       this.recoverIfNeeded();
-    }
-  }
-
-  /** 读取上次选择的代理模式；连接后内核返回的模式会覆盖它。 */
-  private async loadSavedMode(): Promise<void> {
-    try {
-      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      const settings: RuntimeCoreSettings = await loadRuntimeSettings(context);
-      if (settings.mode.length > 0) {
-        this.updateMode(settings.mode);
-      }
-    } catch (error) {
-      console.warn('[HomePage] 读取代理模式失败: ' + (error as Error).message);
     }
   }
 
@@ -259,58 +244,8 @@ export struct HomePage {
       downTotal: this.state.downTotal,
       currentNode: this.state.currentNode,
       currentProfile: this.state.currentProfile,
-      version: this.state.version,
-      mode: this.state.mode
+      version: this.state.version
     };
-  }
-
-  private updateMode(mode: string): void {
-    this.state = {
-      connected: this.state.connected,
-      connecting: this.state.connecting,
-      up: this.state.up,
-      down: this.state.down,
-      upTotal: this.state.upTotal,
-      downTotal: this.state.downTotal,
-      currentNode: this.state.currentNode,
-      currentProfile: this.state.currentProfile,
-      version: this.state.version,
-      mode
-    };
-  }
-
-  /** 首页快捷切换 rule/global/direct；未连接时只持久化，连接后生效。 */
-  private async onModeSelect(mode: string): Promise<void> {
-    if (this.state.connecting || this.state.mode === mode) {
-      return;
-    }
-    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    const previous = this.state.mode;
-    this.updateMode(mode);
-    try {
-      await saveRuntimeMode(context, mode);
-    } catch (error) {
-      console.warn('[HomePage] 保存代理模式失败: ' + (error as Error).message);
-    }
-    const client = ClashClient.getInstance();
-    if (client.getState() !== ClashClientState.Connected) {
-      this.toast('已设为' + this.modeName(mode) + '模式，连接后生效');
-      return;
-    }
-    try {
-      await client.request(RpcMethod.SetOptionState, [JSON.stringify({ mode })], 30000);
-      this.toast('已切换为' + this.modeName(mode) + '模式');
-      await this.vm.refreshNow();
-    } catch (error) {
-      this.updateMode(previous);
-      this.toast('切换模式失败: ' + (error as Error).message);
-    }
-  }
-
-  private modeName(mode: string): string {
-    if (mode === 'global') return '全局';
-    if (mode === 'direct') return '直连';
-    return '规则';
   }
 
   private toast(message: string): void {
@@ -365,9 +300,6 @@ export struct HomePage {
         .backgroundColor($r('app.color.container_background'))
         .alignItems(VerticalAlign.Center)
 
-        // 代理模式快捷切换：规则 / 全局 / 直连
-        this.ModeSwitch()
-
         // 阔直板手机优先使用横向信息带；普通手机保持更易读的纵向卡片。
         if (isWidePhoneBreakpoint(this.widthBp)) {
           Row({ space: 12 }) {
@@ -389,32 +321,6 @@ export struct HomePage {
     }
     .width('100%').height('100%').backgroundColor($r('app.color.background'))
     .align(Alignment.Top).scrollBar(BarState.Off)
-  }
-
-  @Builder
-  private ModeSwitch() {
-    Row({ space: 8 }) {
-      Text('代理模式')
-        .fontSize(13).fontColor($r('app.color.text_secondary')).layoutWeight(1)
-      this.ModeChip('rule', $r('app.string.proxy_mode_rule'))
-      this.ModeChip('global', $r('app.string.proxy_mode_global'))
-      this.ModeChip('direct', $r('app.string.proxy_mode_direct'))
-    }
-    .padding({ left: 16, right: 12, top: 10, bottom: 10 })
-    .width('100%').borderRadius(16)
-    .backgroundColor($r('app.color.container_background'))
-    .alignItems(VerticalAlign.Center)
-  }
-
-  @Builder
-  private ModeChip(mode: string, label: Resource) {
-    Text(label)
-      .fontSize(12)
-      .fontColor(this.state.mode === mode ? Color.White : $r('app.color.text_secondary'))
-      .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-      .backgroundColor(this.state.mode === mode ? $r('app.color.brand') : $r('app.color.button_container_background'))
-      .borderRadius(14)
-      .onClick(() => { this.onModeSelect(mode); })
   }
 
   @Builder

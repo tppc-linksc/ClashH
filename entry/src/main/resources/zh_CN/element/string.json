@@ -1,43 +1,68 @@
 {
   "string": [
-    { "name": "tab_home", "value": "首页" },
-    { "name": "tab_proxy", "value": "代理" },
-    { "name": "tab_config", "value": "配置" },
-    { "name": "tab_more", "value": "更多" },
-    { "name": "home_greeting", "value": "你好" },
-    { "name": "home_connect", "value": "连接" },
-    { "name": "home_disconnect", "value": "断开" },
-    { "name": "home_connecting", "value": "连接中" },
-    { "name": "home_traffic", "value": "实时流量" },
-    { "name": "home_upload", "value": "上行" },
-    { "name": "home_download", "value": "下行" },
-    { "name": "home_total", "value": "总流量" },
-    { "name": "home_current_node", "value": "当前节点" },
-    { "name": "proxy_mode_rule", "value": "规则" },
-    { "name": "proxy_mode_global", "value": "全局" },
-    { "name": "proxy_mode_direct", "value": "直连" },
-    { "name": "proxy_latency_test", "value": "延迟测试" },
-    { "name": "proxy_search", "value": "搜索节点" },
-    { "name": "config_add", "value": "添加" },
-    { "name": "config_import_url", "value": "从链接导入" },
-    { "name": "config_import_file", "value": "从文件导入" },
-    { "name": "config_url_placeholder", "value": "输入订阅链接" },
-    { "name": "config_update", "value": "更新" },
-    { "name": "config_use", "value": "启用" },
-    { "name": "config_delete", "value": "删除" },
-    { "name": "config_current", "value": "当前" },
-    { "name": "config_empty", "value": "暂无配置" },
-    { "name": "more_settings", "value": "设置" },
-    { "name": "more_connection", "value": "连接" },
-    { "name": "more_log", "value": "日志" },
-    { "name": "more_request", "value": "请求记录" },
-    { "name": "more_resource", "value": "资源" },
-    { "name": "more_about", "value": "关于" },
-    { "name": "common_cancel", "value": "取消" },
-    { "name": "common_confirm", "value": "确定" },
-    { "name": "common_back", "value": "返回" },
-    { "name": "common_loading", "value": "加载中" },
-    { "name": "common_empty", "value": "暂无数据" },
-    { "name": "common_ms", "value": "毫秒" }
+    {
+      "name": "tab_config",
+      "value": "配置"
+    },
+    {
+      "name": "home_greeting",
+      "value": "你好"
+    },
+    {
+      "name": "home_connect",
+      "value": "连接"
+    },
+    {
+      "name": "home_disconnect",
+      "value": "断开"
+    },
+    {
+      "name": "home_traffic",
+      "value": "实时流量"
+    },
+    {
+      "name": "home_upload",
+      "value": "上行"
+    },
+    {
+      "name": "home_download",
+      "value": "下行"
+    },
+    {
+      "name": "home_total",
+      "value": "总流量"
+    },
+    {
+      "name": "home_current_node",
+      "value": "当前节点"
+    },
+    {
+      "name": "proxy_mode_rule",
+      "value": "规则"
+    },
+    {
+      "name": "proxy_mode_global",
+      "value": "全局"
+    },
+    {
+      "name": "proxy_mode_direct",
+      "value": "直连"
+    },
+    {
+      "name": "proxy_latency_test",
+      "value": "延迟测试"
+    },
+    {
+      "name": "proxy_search",
+      "value": "搜索节点"
+    },
+    {
+      "name": "config_empty",
+      "value": "暂无配置"
+    },
+    {
+      "name": "proxy_latency_testing",
+      "value": "测速中…"
+    }
   ]
 }

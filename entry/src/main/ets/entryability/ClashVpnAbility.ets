@@ -5,6 +5,7 @@ import { Want, common } from '@kit.AbilityKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { parseYaml } from '../utils/YamlParser';
 import { isOwnVpnActive } from '../service/VpnNetworkStatus';
+import { applyDomesticDirectRules } from '../service/DomesticDirectRules';
 import {
   AppState,
   SocketProxyService,
@@ -528,20 +529,39 @@ class ClashVpnServiceImpl extends ClashVpnService {
       };
       rawConfig['geox-url'] = geoXUrls;
     }
+    // geodata-loader 未显式指定时必须补默认值：Go 侧 hub.go 对 JSON 直接
+    // Unmarshal 到 RawConfig，缺失键会反序列化为空字符串，随后
+    // executor.ApplyConfig 里 geodata.SetLoader("") 会覆盖内核默认的
+    // memconservative 加载器，导致 GEOSITE 规则报
+    // "load GeoSite data error, unable to locate GeoData loader"。
+    if (!rawConfig['geodata-loader']) {
+      rawConfig['geodata-loader'] = 'memconservative';
+    }
 
     // TUN 字段被内核无条件覆盖，必须每次都完整下发。
     rawConfig['tun'] = withDefaults(rawConfig['tun'], defaultTunConfig());
-    // 配置自带 dns / sniffer 时尊重配置，只有缺失时才补默认值。
-    const hasOwnDns = rawConfig['dns'] !== undefined && rawConfig['dns'] !== null;
-    if (!hasOwnDns) {
+    // DNS 只有在“开启 + 配了 nameserver”时才算可用。
+    // 机场订阅常见 dns.enable: false（本例就是），此时内核退回系统解析器；
+    // 鸿蒙 VPN 扩展进程里的系统解析不可靠，而 TUN 又把 53 端口整个劫持给内核，
+    // 结果是所有节点域名都解析不出来 —— 表现为整页节点全部超时。
+    // 因此这类“关掉的 dns 段”等同于没有，直接换成默认 DNS。
+    const hasOwnDns = this.hasUsableDns(rawConfig['dns']);
+    if (hasOwnDns) {
+      // 自带 DNS 时尊重配置，但仍要保证 proxy-server-nameserver 存在：
+      // 节点域名若走代理 DNS，解析请求会绕回隧道自身。
+      rawConfig['dns'] = this.ensureProxyServerNameserver(rawConfig['dns']);
+    } else {
       rawConfig['dns'] = defaultDnsConfig();
     }
+    console.info(TAG, hasOwnDns
+      ? '沿用配置自带 DNS，并补全 proxy-server-nameserver'
+      : '配置未启用可用 DNS，已改用内置 DNS（fake-ip + 国内 DoH）');
     if (rawConfig['sniffer'] === undefined || rawConfig['sniffer'] === null) {
       rawConfig['sniffer'] = defaultSnifferConfig();
     }
 
-    // 国内直连规则：只在配置本身没有 CN 直连规则时补齐，尊重订阅作者的分流规则。
-    if (this.optionState.domesticDirect !== false) {
+    // 国内直连规则只在规则模式生效，开启后优先于宽泛国内分类规则。
+    if (appliedMode === 'rule' && this.optionState.domesticDirect !== false) {
       this.injectDomesticDirectRules(rawConfig);
     }
 
@@ -572,43 +592,54 @@ class ClashVpnServiceImpl extends ClashVpnService {
     return '{"status":"ok"}';
   }
 
-  /** 在 MATCH 之前补国内直连规则；已有 CN 规则时跳过，避免覆盖订阅作者的分流意图。 */
+  /** 在宽泛国内分类规则之前补国内直连，保留此前的具体域名规则。 */
   private injectDomesticDirectRules(config: Record<string, Object | undefined>): void {
     const value = config['rules'];
     if (value === undefined || value === null) {
       return;
     }
     const rules = value as string[];
-    if (!Array.isArray(rules) || this.hasDomesticDirectRule(rules)) {
+    if (!Array.isArray(rules)) {
       return;
     }
-    let matchIndex = -1;
-    for (let i = 0; i < rules.length; i++) {
-      const rule = rules[i];
-      if (typeof rule === 'string' && rule.trim().toUpperCase().startsWith('MATCH')) {
-        matchIndex = i;
-        break;
-      }
+    const result = applyDomesticDirectRules(rules);
+    if (result.insertedRules.length === 0) {
+      return;
     }
-    const insertAt = matchIndex >= 0 ? matchIndex : rules.length;
-    rules.splice(insertAt, 0, 'DOMAIN-SUFFIX,cn,DIRECT', 'GEOSITE,cn,DIRECT', 'GEOIP,CN,DIRECT');
-    config['rules'] = rules;
-    console.info(TAG, '已注入国内直连规则，共 ' + rules.length + ' 条');
+    config['rules'] = result.rules;
+    console.info(TAG, '已注入国内直连规则: ' + result.insertedRules.join(' | '));
+    if (result.uncertainChinaRuleSet) {
+      console.warn(TAG, '检测到名称含 CN/China 的 RULE-SET，已在该规则前插入国内直连规则；请检查复杂规则集是否包含自定义例外');
+    }
   }
 
-  private hasDomesticDirectRule(rules: string[]): boolean {
-    for (let i = 0; i < rules.length; i++) {
-      const rule = rules[i];
-      if (typeof rule !== 'string') {
-        continue;
-      }
-      const normalized = rule.toUpperCase().replace(/\s+/g, '');
-      if (normalized.indexOf('GEOSITE,CN') === 0 || normalized.indexOf('GEOIP,CN') === 0 ||
-        normalized.indexOf('DOMAIN-SUFFIX,CN') === 0 || normalized.indexOf('DOMAIN,CN') === 0) {
-        return true;
-      }
+  /** 判断配置里的 dns 段是否真的可用：必须显式开启，且至少配置了一个 nameserver。 */
+  private hasUsableDns(value: Object | undefined): boolean {
+    if (value === undefined || value === null) {
+      return false;
     }
-    return false;
+    const dns = value as Record<string, Object | undefined>;
+    // 订阅里常见 enable: false，或只写了 enhanced-mode 却没开 DNS，这些都不能用。
+    if (String(dns['enable']) !== 'true') {
+      return false;
+    }
+    const nameservers = dns['nameserver'] as Object[];
+    return Array.isArray(nameservers) && nameservers.length > 0;
+  }
+
+  /** 配置自带 DNS 时补上 proxy-server-nameserver，避免节点域名解析请求绕回隧道自身。 */
+  private ensureProxyServerNameserver(value: Object | undefined): Record<string, Object | undefined> {
+    const dns = (value ?? {}) as Record<string, Object | undefined>;
+    const existing = dns['proxy-server-nameserver'] as Object[];
+    if (Array.isArray(existing) && existing.length > 0) {
+      return dns;
+    }
+    const defaults = defaultDnsConfig();
+    dns['proxy-server-nameserver'] = defaults['proxy-server-nameserver'];
+    if (dns['default-nameserver'] === undefined) {
+      dns['default-nameserver'] = defaults['default-nameserver'];
+    }
+    return dns;
   }
 
   private async loadSelectedMap(profileId: string): Promise<Record<string, string>> {
@@ -634,7 +665,16 @@ class ClashVpnServiceImpl extends ClashVpnService {
   private async testDelayBatch(request: RpcRequest): Promise<string> {
     const encoded = this.stringParam(request, 0, '代理节点列表');
     const names = JSON.parse(encoded) as string[];
-    const delays: string[] = await Promise.all(names.map(async (name: string) => this.testDelay(name)));
+    // 分批测速：上百节点同时发起会形成并发风暴，挤占内核 RPC 通道拖慢其它请求。
+    const batchSize = 8;
+    const delays: string[] = [];
+    for (let i = 0; i < names.length; i += batchSize) {
+      const chunk = names.slice(i, i + batchSize);
+      const results = await Promise.all(chunk.map(async (name: string) => this.testDelay(name)));
+      for (const result of results) {
+        delays.push(result);
+      }
+    }
     return '[' + delays.join(',') + ']';
   }
 

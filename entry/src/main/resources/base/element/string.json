@@ -1,74 +1,96 @@
 {
   "string": [
-    { "name": "module_desc", "value": "ClashH 主模块" },
-    { "name": "EntryAbility_desc", "value": "ClashH 入口" },
-    { "name": "EntryAbility_label", "value": "ClashH" },
-    { "name": "ClashVpnAbility_desc", "value": "ClashH VPN 后台服务" },
-    { "name": "ClashVpnAbility_label", "value": "ClashH VPN" },
-    { "name": "tab_home", "value": "首页" },
-    { "name": "tab_proxy", "value": "代理" },
-    { "name": "tab_config", "value": "配置" },
-    { "name": "tab_more", "value": "更多" },
-    { "name": "home_greeting", "value": "你好" },
-    { "name": "home_connect", "value": "连接" },
-    { "name": "home_disconnect", "value": "断开" },
-    { "name": "home_connecting", "value": "连接中" },
-    { "name": "home_traffic", "value": "实时流量" },
-    { "name": "home_upload", "value": "上行" },
-    { "name": "home_download", "value": "下行" },
-    { "name": "home_total", "value": "总流量" },
-    { "name": "home_current_node", "value": "当前节点" },
-    { "name": "home_quick_switch", "value": "快速切换" },
-    { "name": "home_no_profile", "value": "尚未选择配置，请先导入订阅" },
-    { "name": "proxy_mode_rule", "value": "规则" },
-    { "name": "proxy_mode_global", "value": "全局" },
-    { "name": "proxy_mode_direct", "value": "直连" },
-    { "name": "proxy_latency_test", "value": "延迟测试" },
-    { "name": "proxy_search", "value": "搜索节点" },
-    { "name": "proxy_no_group", "value": "暂无代理组" },
-    { "name": "config_add", "value": "添加" },
-    { "name": "config_import_url", "value": "从链接导入" },
-    { "name": "config_import_file", "value": "从文件导入" },
-    { "name": "config_create", "value": "新建配置" },
-    { "name": "config_url_placeholder", "value": "输入订阅链接" },
-    { "name": "config_update", "value": "更新" },
-    { "name": "config_use", "value": "启用" },
-    { "name": "config_delete", "value": "删除" },
-    { "name": "config_edit", "value": "编辑" },
-    { "name": "config_current", "value": "当前" },
-    { "name": "config_empty", "value": "暂无配置" },
-    { "name": "more_settings", "value": "设置" },
-    { "name": "more_connection", "value": "连接" },
-    { "name": "more_log", "value": "日志" },
-    { "name": "more_request", "value": "请求记录" },
-    { "name": "more_resource", "value": "资源" },
-    { "name": "more_about", "value": "关于" },
-    { "name": "setting_tun", "value": "TUN 模式" },
-    { "name": "setting_sysproxy", "value": "系统代理" },
-    { "name": "setting_language", "value": "语言" },
-    { "name": "setting_theme", "value": "外观" },
-    { "name": "setting_theme_follow", "value": "跟随系统" },
-    { "name": "setting_theme_light", "value": "浅色" },
-    { "name": "setting_theme_dark", "value": "深色" },
-    { "name": "setting_auto_launch", "value": "自动启动" },
-    { "name": "setting_keepalive", "value": "后台运行" },
-    { "name": "setting_dns", "value": "DNS 设置" },
-    { "name": "setting_port", "value": "端口设置" },
-    { "name": "setting_mixed_port", "value": "混合端口" },
-    { "name": "setting_version", "value": "版本" },
-    { "name": "setting_license", "value": "许可证" },
-    { "name": "common_cancel", "value": "取消" },
-    { "name": "common_confirm", "value": "确定" },
-    { "name": "common_delete", "value": "删除" },
-    { "name": "common_back", "value": "返回" },
-    { "name": "common_refresh", "value": "刷新" },
-    { "name": "common_loading", "value": "加载中" },
-    { "name": "common_error", "value": "错误" },
-    { "name": "common_empty", "value": "暂无数据" },
-    { "name": "common_ms", "value": "毫秒" },
-    { "name": "common_off", "value": "关闭" },
-    { "name": "common_on", "value": "开启" },
-    { "name": "perm_camera_reason", "value": "用于扫描订阅链接二维码" },
-    { "name": "perm_media_reason", "value": "用于读取二维码图片" }
+    {
+      "name": "module_desc",
+      "value": "ClashH 主模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "ClashH 入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "ClashH"
+    },
+    {
+      "name": "ClashVpnAbility_desc",
+      "value": "ClashH VPN 后台服务"
+    },
+    {
+      "name": "ClashVpnAbility_label",
+      "value": "ClashH VPN"
+    },
+    {
+      "name": "tab_config",
+      "value": "配置"
+    },
+    {
+      "name": "home_greeting",
+      "value": "你好"
+    },
+    {
+      "name": "home_connect",
+      "value": "连接"
+    },
+    {
+      "name": "home_disconnect",
+      "value": "断开"
+    },
+    {
+      "name": "home_traffic",
+      "value": "实时流量"
+    },
+    {
+      "name": "home_upload",
+      "value": "上行"
+    },
+    {
+      "name": "home_download",
+      "value": "下行"
+    },
+    {
+      "name": "home_total",
+      "value": "总流量"
+    },
+    {
+      "name": "home_current_node",
+      "value": "当前节点"
+    },
+    {
+      "name": "home_no_profile",
+      "value": "尚未选择配置，请先导入订阅"
+    },
+    {
+      "name": "proxy_mode_rule",
+      "value": "规则"
+    },
+    {
+      "name": "proxy_mode_global",
+      "value": "全局"
+    },
+    {
+      "name": "proxy_mode_direct",
+      "value": "直连"
+    },
+    {
+      "name": "proxy_latency_test",
+      "value": "延迟测试"
+    },
+    {
+      "name": "proxy_search",
+      "value": "搜索节点"
+    },
+    {
+      "name": "config_empty",
+      "value": "暂无配置"
+    },
+    {
+      "name": "perm_camera_reason",
+      "value": "用于扫描订阅链接二维码"
+    },
+    {
+      "name": "proxy_latency_testing",
+      "value": "测速中…"
+    }
   ]
 }

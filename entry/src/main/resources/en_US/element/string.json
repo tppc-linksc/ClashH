@@ -1,72 +1,96 @@
 {
   "string": [
-    { "name": "module_desc", "value": "ClashH main module" },
-    { "name": "EntryAbility_desc", "value": "ClashH entry" },
-    { "name": "EntryAbility_label", "value": "ClashH" },
-    { "name": "ClashVpnAbility_desc", "value": "ClashH VPN background service" },
-    { "name": "ClashVpnAbility_label", "value": "ClashH VPN" },
-    { "name": "tab_home", "value": "Home" },
-    { "name": "tab_proxy", "value": "Proxies" },
-    { "name": "tab_config", "value": "Profiles" },
-    { "name": "tab_more", "value": "More" },
-    { "name": "home_greeting", "value": "Hello" },
-    { "name": "home_connect", "value": "Connect" },
-    { "name": "home_disconnect", "value": "Disconnect" },
-    { "name": "home_connecting", "value": "Connecting" },
-    { "name": "home_traffic", "value": "Live Traffic" },
-    { "name": "home_upload", "value": "Up" },
-    { "name": "home_download", "value": "Down" },
-    { "name": "home_total", "value": "Total" },
-    { "name": "home_current_node", "value": "Current Node" },
-    { "name": "home_quick_switch", "value": "Quick Switch" },
-    { "name": "home_no_profile", "value": "No profile yet, import a subscription first" },
-    { "name": "proxy_mode_rule", "value": "Rule" },
-    { "name": "proxy_mode_global", "value": "Global" },
-    { "name": "proxy_mode_direct", "value": "Direct" },
-    { "name": "proxy_latency_test", "value": "Latency Test" },
-    { "name": "proxy_search", "value": "Search nodes" },
-    { "name": "proxy_no_group", "value": "No proxy groups" },
-    { "name": "config_add", "value": "Add" },
-    { "name": "config_import_url", "value": "Import from URL" },
-    { "name": "config_import_file", "value": "Import from file" },
-    { "name": "config_create", "value": "New profile" },
-    { "name": "config_url_placeholder", "value": "Subscription URL" },
-    { "name": "config_update", "value": "Update" },
-    { "name": "config_use", "value": "Use" },
-    { "name": "config_delete", "value": "Delete" },
-    { "name": "config_edit", "value": "Edit" },
-    { "name": "config_current", "value": "Current" },
-    { "name": "config_empty", "value": "No profiles" },
-    { "name": "more_settings", "value": "Settings" },
-    { "name": "more_connection", "value": "Connections" },
-    { "name": "more_log", "value": "Logs" },
-    { "name": "more_request", "value": "Requests" },
-    { "name": "more_resource", "value": "Resources" },
-    { "name": "more_about", "value": "About" },
-    { "name": "setting_tun", "value": "TUN Mode" },
-    { "name": "setting_sysproxy", "value": "System Proxy" },
-    { "name": "setting_language", "value": "Language" },
-    { "name": "setting_theme", "value": "Appearance" },
-    { "name": "setting_theme_follow", "value": "Follow system" },
-    { "name": "setting_theme_light", "value": "Light" },
-    { "name": "setting_theme_dark", "value": "Dark" },
-    { "name": "setting_auto_launch", "value": "Auto launch" },
-    { "name": "setting_keepalive", "value": "Keep alive" },
-    { "name": "setting_dns", "value": "DNS Settings" },
-    { "name": "setting_port", "value": "Port Settings" },
-    { "name": "setting_mixed_port", "value": "Mixed Port" },
-    { "name": "setting_version", "value": "Version" },
-    { "name": "setting_license", "value": "License" },
-    { "name": "common_cancel", "value": "Cancel" },
-    { "name": "common_confirm", "value": "OK" },
-    { "name": "common_delete", "value": "Delete" },
-    { "name": "common_back", "value": "Back" },
-    { "name": "common_refresh", "value": "Refresh" },
-    { "name": "common_loading", "value": "Loading" },
-    { "name": "common_error", "value": "Error" },
-    { "name": "common_empty", "value": "Empty" },
-    { "name": "common_ms", "value": "ms" },
-    { "name": "common_off", "value": "Off" },
-    { "name": "common_on", "value": "On" }
+    {
+      "name": "module_desc",
+      "value": "ClashH main module"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "ClashH entry"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "ClashH"
+    },
+    {
+      "name": "ClashVpnAbility_desc",
+      "value": "ClashH VPN background service"
+    },
+    {
+      "name": "ClashVpnAbility_label",
+      "value": "ClashH VPN"
+    },
+    {
+      "name": "tab_config",
+      "value": "Profiles"
+    },
+    {
+      "name": "home_greeting",
+      "value": "Hello"
+    },
+    {
+      "name": "home_connect",
+      "value": "Connect"
+    },
+    {
+      "name": "home_disconnect",
+      "value": "Disconnect"
+    },
+    {
+      "name": "home_traffic",
+      "value": "Live Traffic"
+    },
+    {
+      "name": "home_upload",
+      "value": "Up"
+    },
+    {
+      "name": "home_download",
+      "value": "Down"
+    },
+    {
+      "name": "home_total",
+      "value": "Total"
+    },
+    {
+      "name": "home_current_node",
+      "value": "Current Node"
+    },
+    {
+      "name": "home_no_profile",
+      "value": "No profile yet, import a subscription first"
+    },
+    {
+      "name": "proxy_mode_rule",
+      "value": "Rule"
+    },
+    {
+      "name": "proxy_mode_global",
+      "value": "Global"
+    },
+    {
+      "name": "proxy_mode_direct",
+      "value": "Direct"
+    },
+    {
+      "name": "proxy_latency_test",
+      "value": "Latency Test"
+    },
+    {
+      "name": "proxy_search",
+      "value": "Search nodes"
+    },
+    {
+      "name": "config_empty",
+      "value": "No profiles"
+    },
+    {
+      "name": "proxy_latency_testing",
+      "value": "Testing…"
+    },
+    {
+      "name": "perm_camera_reason",
+      "value": "Used to scan QR codes of subscription links"
+    }
   ]
 }

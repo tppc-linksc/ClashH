@@ -184,10 +184,13 @@ export struct ConfigurationPage {
   }
 
   openProfile(profile: Profile): void {
-    this.editingUid = profile.uid;
-    this.editingName = profile.name;
-    this.editingUrl = profile.url ?? '';
-    this.editingDesc = profile.desc ?? '';
+    // 列表项的 p 是渲染时捕获的旧对象，改名后可能仍是旧值；
+    // 一律以 this.profiles 里的最新数据为准，避免详情页回填旧名称。
+    const latest = this.profiles.find((item: Profile) => item.uid === profile.uid) ?? profile;
+    this.editingUid = latest.uid;
+    this.editingName = latest.name;
+    this.editingUrl = latest.url ?? '';
+    this.editingDesc = latest.desc ?? '';
     this.pathStack.pushPathByName('profile-detail', null);
   }
 
@@ -257,24 +260,6 @@ export struct ConfigurationPage {
     } catch (error) {
       console.warn('[ConfigurationPage] 显示提示失败: ' + (error as Error).message);
     }
-  }
-
-  getStr(key: string): string {
-    try {
-      return (this.getUIContext().getHostContext() as common.UIAbilityContext)
-        .resourceManager.getStringByNameSync(key.split('.').pop() as string);
-    } catch (error) {
-      console.warn('[ConfigurationPage] 读取文案失败: ' + (error as Error).message);
-      return key;
-    }
-  }
-
-  trafficText(p: Profile): string {
-    if (!p.extra) return '';
-    const used = p.extra.upload + p.extra.download;
-    const total = p.extra.total;
-    if (total <= 0) return '';
-    return `已用 ${Math.floor((used / total) * 100)}%`;
   }
 
   profileTypeText(profile: Profile): string {
@@ -355,7 +340,9 @@ export struct ConfigurationPage {
             ListItem() {
               this.ProfileCard(p)
             }
-          }, (p: Profile) => p.uid)
+          // key 必须带上会被修改的字段：只写 uid 时，改名后 key 不变，
+          // ForEach 会复用旧节点，列表和详情页都会停留在旧名称。
+          }, (p: Profile) => `${p.uid}:${p.name}:${p.desc ?? ''}:${p.url ?? ''}:${p.updated}`)
         }
         .padding({ left: isWidePhoneBreakpoint(this.widthBp) ? 16 : 12,
           right: isWidePhoneBreakpoint(this.widthBp) ? 16 : 12,

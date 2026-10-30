@@ -305,6 +305,20 @@ class NameRegistry {
 // 各协议解析
 // ---------------------------------------------------------------------------
 
+/** VLESS / Trojan 的“跳过证书校验”开关：不同客户端写成 allowInsecure / allow_insecure / insecure。 */
+function isInsecure(link: ShareLink): boolean {
+  if (isTruthy(link.get('allowInsecure')) || isTruthy(link.get('allow_insecure'))) {
+    return true;
+  }
+  return isTruthy(link.get('insecure'));
+}
+
+/** TLS 的 SNI：优先 sni，其次 peer（小火箭/v2rayN 混用两种写法）。 */
+function tlsServername(link: ShareLink): string {
+  const sni = link.get('sni');
+  return sni.length > 0 ? sni : link.get('peer');
+}
+
 /** VMess / VLESS 共用的 Xray 分享链接字段（handleVShareLink 的移植）。 */
 function applyVShareLink(link: ShareLink, node: JsonNode): boolean {
   if (link.host.length === 0 || link.port.length === 0) {
@@ -323,7 +337,13 @@ function applyVShareLink(link: ShareLink, node: JsonNode): boolean {
     node.list('alpn', splitAlpn(link.get('alpn')));
     node.str('fingerprint', link.get('pcs'));
   }
-  node.str('servername', link.get('sni'));
+  node.str('servername', tlsServername(link));
+  // 分享链接用 allowInsecure=1 表示“证书不可校验也能连”。
+  // 机场常见做法是用别人的域名做 SNI（如 baidu.com）+ 自签证书，
+  // 丢掉这个开关会让 TLS 握手直接失败，表现为整组节点全部超时。
+  if (isInsecure(link)) {
+    node.bool('skip-cert-verify', true);
+  }
 
   const publicKey = link.get('pbk');
   if (publicKey.length > 0) {
@@ -510,10 +530,10 @@ function parseTrojan(link: ShareLink, name: string): JsonNode | undefined {
   node.num('port', toPort(link.port));
   node.str('password', link.username);
   node.bool('udp', true);
-  if (isTruthy(link.get('allowInsecure'))) {
+  if (isInsecure(link)) {
     node.bool('skip-cert-verify', true);
   }
-  node.str('sni', link.get('sni'));
+  node.str('sni', tlsServername(link));
   node.list('alpn', splitAlpn(link.get('alpn')));
 
   const network = link.get('type').toLowerCase();
@@ -627,7 +647,7 @@ function parseHysteria2(link: ShareLink, name: string): JsonNode | undefined {
   node.str('obfs', link.get('obfs'));
   node.str('obfs-password', link.get('obfs-password'));
   node.str('sni', link.get('sni'));
-  if (isTruthy(link.get('insecure'))) {
+  if (isInsecure(link)) {
     node.bool('skip-cert-verify', true);
   }
   node.list('alpn', splitAlpn(link.get('alpn')));
@@ -655,7 +675,7 @@ function parseHysteria(link: ShareLink, name: string): JsonNode | undefined {
   const down = link.get('down').length > 0 ? link.get('down') : link.get('downmbps');
   node.str('up', up);
   node.str('down', down);
-  if (isTruthy(link.get('insecure'))) {
+  if (isInsecure(link)) {
     node.bool('skip-cert-verify', true);
   }
   return node;

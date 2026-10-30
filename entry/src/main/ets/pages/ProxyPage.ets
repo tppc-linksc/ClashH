@@ -10,6 +10,11 @@ import { isWidePhoneBreakpoint } from '../common/breakpoint/BreakPointSystem2D';
 const DELAY_GOOD_MS = 280;
 const DELAY_FAIR_MS = 660;
 
+// Index 里的 HdsTabs 开了 barOverlap，TabContent 会延伸到悬浮 Dock 之下。
+// 列表底部必须让出 Dock 高度（barHeight 52）+ 底部边距（手机 8）+ 材质渐变余量，
+// 否则滚动到底部时最后几个节点被 Dock 遮住。与配置页列表的 104 保持一致。
+const DOCK_BOTTOM_INSET = 104;
+
 @Component
 export struct ProxyPage {
   @StorageLink('currentWidthBreakpoint') widthBp: number = 1;
@@ -22,9 +27,12 @@ export struct ProxyPage {
   @State hasProfile: boolean = false;
   @State groups: ProxyGroup[] = [];
   @State proxies: Record<string, Proxy> = {};
+  /** 本次会话最近一次测速结果，测速结束时立即生效，不等内核 history。 */
+  @State delays: Record<string, number> = {};
   @State mode: string = 'rule';
   @State keyword: string = '';
   @State testingNames: string[] = [];
+  @State testingGroup: string = '';
   @State expandedNames: string[] = [];
 
   /** 模式选项 */
@@ -42,12 +50,20 @@ export struct ProxyPage {
   onActiveChanged(): void {
     if (this.active) {
       this.refresh();
+    } else {
+      // 离开代理页就停止测速轮询，回来时由 refresh 重新对齐。
+      this.vm.stopPolling();
     }
+  }
+
+  aboutToDisappear(): void {
+    this.vm.stopPolling();
   }
 
   private refresh(): void {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    this.vm.refresh(context);
+    // 已有代理列表时静默刷新：切回本页不闪 loading，后台更新数据。
+    this.vm.refresh(context, this.vm.groups.length > 0);
   }
 
   private syncViewState(): void {
@@ -56,9 +72,12 @@ export struct ProxyPage {
     this.hasProfile = this.vm.hasProfile;
     this.groups = Array.from(this.vm.groups);
     this.proxies = this.vm.proxies;
+    // 必须拷贝成新对象：@State 只有引用变化才会触发重建。
+    this.delays = this.copyDelays(this.vm.delays);
     this.mode = this.vm.mode;
     this.keyword = this.vm.keyword;
     this.testingNames = Array.from(this.vm.testing);
+    this.testingGroup = this.vm.testingGroup;
     this.expandedNames = Array.from(this.vm.expanded);
   }
 
@@ -88,12 +107,33 @@ export struct ProxyPage {
     }
   }
 
-  /** 延迟显示文本 */
+  /** 延迟显示文本：优先用最近一次测速结果，其次回落到内核 history。 */
   delayText(name: string): string {
+    const delay = this.delayValue(name);
+    if (delay === undefined) return '--';
+    return delay <= 0 ? '超时' : delay + 'ms';
+  }
+
+  /** 取节点延迟：本地测速结果优先，内核 history 作为冷启动时的来源。 */
+  private delayValue(name: string): number | undefined {
+    const local = this.delays[name];
+    if (typeof local === 'number') {
+      return local;
+    }
     const p = this.proxies[name];
-    if (!p || !p.history || p.history.length === 0) return '--';
-    const last = p.history[p.history.length - 1];
-    return last.delay < 0 ? '超时' : last.delay + 'ms';
+    if (!p || !p.history || p.history.length === 0) {
+      return undefined;
+    }
+    return p.history[p.history.length - 1].delay;
+  }
+
+  private copyDelays(source: Record<string, number>): Record<string, number> {
+    const copy: Record<string, number> = {};
+    const keys = Object.keys(source);
+    for (let i = 0; i < keys.length; i++) {
+      copy[keys[i]] = source[keys[i]];
+    }
+    return copy;
   }
 
   /** 节点图标（按类型） */
@@ -165,9 +205,9 @@ export struct ProxyPage {
           Column({ space: 10 }) {
             ForEach(this.filteredGroups(), (group: ProxyGroup) => {
               this.GroupCard(group)
-            }, (g: ProxyGroup) => g.name)
+            }, (g: ProxyGroup) => `${g.name}:${g.now ?? ''}`)
           }
-          .padding(12)
+          .padding({ left: 12, right: 12, top: 12, bottom: DOCK_BOTTOM_INSET })
           .width('100%')
         }
         .layoutWeight(1)
@@ -254,14 +294,28 @@ export struct ProxyPage {
           .fontColor($r('app.color.text_secondary'))
           .margin({ right: 8 })
           .maxLines(1)
-        // 测速按钮
-        Button($r('app.string.proxy_latency_test'))
+        // 测速按钮：批量测速进行中时显示转圈
+        if (this.testingGroup === group.name) {
+          Row({ space: 5 }) {
+            LoadingProgress().width(14).height(14)
+              .color($r('app.color.text_primary'))
+            Text($r('app.string.proxy_latency_testing'))
+              .fontSize(11)
+              .fontColor($r('app.color.text_secondary'))
+          }
           .height(26)
-          .fontSize(11)
-          .type(ButtonType.Capsule)
+          .padding({ left: 10, right: 10 })
+          .borderRadius(13)
           .backgroundColor($r('app.color.button_container_background'))
-          .fontColor($r('app.color.text_primary'))
-          .onClick(() => { this.vm.testGroup(group); })
+        } else {
+          Button($r('app.string.proxy_latency_test'))
+            .height(26)
+            .fontSize(11)
+            .type(ButtonType.Capsule)
+            .backgroundColor($r('app.color.button_container_background'))
+            .fontColor($r('app.color.text_primary'))
+            .onClick(() => { this.vm.testGroup(group); })
+        }
         // 展开箭头
         Text(this.expandedNames.includes(group.name) ? '▾' : '▸')
           .fontSize(14)
@@ -322,10 +376,10 @@ export struct ProxyPage {
 
   /** 延迟颜色：绿/黄/红。阈值见 DELAY_GOOD_MS / DELAY_FAIR_MS。 */
   delayColor(name: string): ResourceColor {
-    const p = this.proxies[name];
-    if (!p || !p.history || p.history.length === 0) return $r('app.color.text_tertiary');
-    const delay = p.history[p.history.length - 1].delay;
-    if (delay < 0) return $r('app.color.error');
+    const delay = this.delayValue(name);
+    if (delay === undefined) return $r('app.color.text_tertiary');
+    // 0 同样是失败（内核失败样本写入 delay=0），与负值一并归入错误色。
+    if (delay <= 0) return $r('app.color.error');
     if (delay <= DELAY_GOOD_MS) return $r('app.color.success');
     if (delay <= DELAY_FAIR_MS) return $r('app.color.warning');
     return $r('app.color.error');

@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
 	"github.com/metacubex/mihomo/config"
@@ -185,8 +186,16 @@ func handleAsyncTestDelay(data string, fn func(string)) {
 	if url == "" {
 		url = "http://www.gstatic.com/generate_204"
 	}
+	// 之前用 context.Background() 拨号，params.Timeout 形同虚设：
+	// 不可达节点会一直卡到内核默认拨号超时，批量测速时整组看起来像卡死。
+	timeout := time.Duration(params.Timeout) * time.Millisecond
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
 	go func() {
-		delay, err := proxy.URLTest(context.Background(), url, nil)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		delay, err := proxy.URLTest(ctx, url, nil)
 		if err != nil {
 			fn(`{"delay":-1}`)
 			return

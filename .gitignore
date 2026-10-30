@@ -11,9 +11,14 @@ proxy_core/BuildProfile.ets
 # Build outputs
 build/
 entry/build/
+entry/.test/
+proxy_core/.test/
 proxy_core/build/
 *.hap
 *.app
+
+# 本地工作数据（AI 助手/编辑器缓存，不随仓库同步）
+.workbuddy/
 
 # Node
 node_modules/

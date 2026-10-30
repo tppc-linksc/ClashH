@@ -99,6 +99,11 @@ cd proxy_core/src/flclash
 - [x] 连接列表 / 日志实时流
 - [ ] 上架与签名
 
+## 更新记录
+
+每次发布的改动、原因与涉及文件见 [CHANGELOG.md](CHANGELOG.md)。
+最近一次（2026-10-30）修复了代理页 Dock 遮挡、配置改名不刷新、订阅 DNS 兼容、分享链接 `allowInsecure` 丢失与测速结果不刷新等问题。
+
 ## 参考项目
 
 | 项目 | 说明 | 许可证 |

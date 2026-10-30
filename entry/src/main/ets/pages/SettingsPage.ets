@@ -63,6 +63,7 @@ const KEY_THEME = 'theme';
 const KEY_DNS = 'dns';
 const KEY_PORT = 'mixedPort';
 const KEY_DOMESTIC_DIRECT = 'domesticDirect';
+const KEY_MODE = 'mode';
 
 @Component
 export struct SettingsPage {
@@ -71,6 +72,7 @@ export struct SettingsPage {
   @State customDns: string = '';
   @State mixedPort: string = '7890';
   @State domesticDirect: boolean = true;
+  @State runtimeMode: string = '';
   @State dnsInput: string = '';
   @State portInput: string = '';
 
@@ -94,6 +96,7 @@ export struct SettingsPage {
       this.customDns = String(await this.store.get(KEY_DNS, ''));
       this.mixedPort = String(await this.store.get(KEY_PORT, '7890'));
       this.domesticDirect = Boolean(await this.store.get(KEY_DOMESTIC_DIRECT, true));
+      this.runtimeMode = String(await this.store.get(KEY_MODE, '')).trim().toLowerCase();
       this.applyTheme(this.theme);
     } catch (e) {
       console.error('[Settings] 加载失败:', (e as Error).message);
@@ -325,20 +328,25 @@ export struct SettingsPage {
     }
   }
 
-  /** 开启/关闭“国内直连规则”；连接中通过 SetOptionState 让内核重新加载配置。 */
+  /** 规则模式下开启/关闭国内直连；连接中通过 SetOptionState 重载配置。 */
   async toggleDomesticDirect(): Promise<void> {
+    const previousValue = this.domesticDirect;
     this.domesticDirect = !this.domesticDirect;
     await this.saveKey(KEY_DOMESTIC_DIRECT, this.domesticDirect);
     const label = this.domesticDirect ? '已开启国内直连规则' : '已关闭国内直连规则';
+    const inactiveMode = this.runtimeMode === 'global' || this.runtimeMode === 'direct';
+    const modeHint = inactiveMode ? '；当前全局/直连模式下不生效' : '；仅规则模式生效';
     if (this.client.getState() !== ClashClientState.Connected) {
-      this.toast(label + '，连接后生效');
+      this.toast(label + modeHint + '，连接后生效');
       return;
     }
     try {
       await this.client.request(RpcMethod.SetOptionState,
         [JSON.stringify({ domesticDirect: this.domesticDirect })], 30000);
-      this.toast(label);
+      this.toast(label + modeHint);
     } catch (error) {
+      this.domesticDirect = previousValue;
+      await this.saveKey(KEY_DOMESTIC_DIRECT, previousValue);
       this.toast('应用失败: ' + (error as Error).message);
     }
   }
@@ -377,6 +385,13 @@ export struct SettingsPage {
     return '跟随系统';
   }
 
+  domesticDirectValue(): string {
+    if (this.runtimeMode === 'global' || this.runtimeMode === 'direct') {
+      return '当前模式无效';
+    }
+    return '规则模式有效';
+  }
+
   groups(): SettingItem[][] {
     return [
       [
@@ -386,7 +401,7 @@ export struct SettingsPage {
       [
         { icon: $r('sys.symbol.wifi_router_fill'), title: 'DNS 设置', value: this.customDns === '' ? '默认' : this.customDns, action: 'dns' },
         { icon: $r('sys.symbol.connection'), title: '端口设置', value: this.mixedPort, action: 'port' },
-        { icon: $r('sys.symbol.network_acceleration'), title: '国内直连规则', value: this.domesticDirect ? '开启' : '关闭', action: 'domestic' },
+        { icon: $r('sys.symbol.network_acceleration'), title: '国内直连规则', value: this.domesticDirect ? this.domesticDirectValue() : '关闭', action: 'domestic' },
       ],
       [
         { icon: $r('sys.symbol.info_circle_fill'), title: '关于', value: 'v0.1.0', action: 'about' },
